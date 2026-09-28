@@ -120,12 +120,9 @@ pub fn core_main() -> Option<Vec<String>> {
     if _is_flutter_invoke_new_connection {
         return core_main_invoke_new_connection(std::env::args());
     }
-    let click_setup = cfg!(windows) && args.is_empty() && crate::common::is_setup(&arg_exe);
-    if click_setup && !config::is_disable_installation() {
-        args.push("--install".to_owned());
-        flutter_args.push("--install".to_string());
-    }
-    if args.contains(&"--noinstall".to_string()) {
+    let is_noinstall = args.contains(&"--noinstall".to_string());
+    let click_setup = false;
+    if is_noinstall {
         args.clear();
     }
     // The portable wrapper injects `--install` when its name ends with `install.exe`,
@@ -150,7 +147,7 @@ pub fn core_main() -> Option<Vec<String>> {
             && args.is_empty()
             && (is_quick_support_exe(&arg_exe)
                 || config::LocalConfig::get_option("pre-elevate-service") == "Y"
-                || (!click_setup && crate::platform::is_elevated(None).unwrap_or(false)));
+                || crate::platform::is_elevated(None).unwrap_or(false));
         crate::portable_service::client::set_quick_support(_is_quick_support);
     }
     let mut log_name = "".to_owned();
@@ -172,6 +169,28 @@ pub fn core_main() -> Option<Vec<String>> {
     #[cfg(all(target_os = "linux", feature = "flutter"))]
     if args.len() > 0 && args[0].starts_with(&crate::get_uri_prefix()) {
         return try_send_by_dbus(args[0].clone());
+    }
+
+    #[cfg(windows)]
+    if !config::is_disable_installation()
+        && !is_noinstall
+        && !crate::platform::is_cur_exe_the_installed()
+        && (!crate::platform::is_installed() || crate::ui_interface::is_installed_lower_version())
+        && (args.is_empty() || (args.len() == 1 && args[0] == "--install"))
+        && !_is_elevate
+        && !_is_run_as_system
+    {
+        log::info!("Forced silent install: initializing automatic installation...");
+        let options = crate::platform::get_silent_install_options(None);
+        match crate::platform::install_me(options, "".to_owned(), false, false) {
+            Ok(_) => {
+                log::info!("Forced silent install succeeded, handing over to installed client.");
+                return None;
+            }
+            Err(err) => {
+                log::warn!("Forced silent install skipped or failed: {err}");
+            }
+        }
     }
 
     #[cfg(windows)]
