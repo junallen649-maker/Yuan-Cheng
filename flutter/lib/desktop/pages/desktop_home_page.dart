@@ -24,7 +24,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:window_size/window_size.dart' as window_size;
 import '../widgets/button.dart';
-import '../widgets/desk_account_dialog.dart';
 import '../widgets/desk_device_detail_view.dart';
 import '../widgets/desk_remote_assist_view.dart';
 import 'package:flutter_hbb/common/widgets/peer_tab_page.dart';
@@ -168,157 +167,17 @@ class _DesktopHomePageState extends State<DesktopHomePage>
             ),
           ),
 
-          // 2. 个人账号卡片 (邮箱登录/状态)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Obx(() {
-              final userName = gFFI.userModel.userName.value;
-              final isLogin = userName.isNotEmpty;
-
-              if (isLogin) {
-                return Material(
-                  color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(10),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () => DeskAccountDialog.show(context),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 14,
-                            backgroundColor: const Color(0xFF1E6FFF),
-                            child: Text(
-                              userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  userName,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                ),
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: const BoxDecoration(
-                                        color: Color(0xFF10B981),
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    const Text(
-                                      '已登录',
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        color: Color(0xFF10B981),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Icon(
-                            Icons.arrow_forward_ios_rounded,
-                            size: 11,
-                            color: Colors.grey,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              return Material(
-                color: const Color(0xFF1E6FFF).withOpacity(0.06),
-                borderRadius: BorderRadius.circular(10),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () => DeskAccountDialog.show(context),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: const Color(0xFF1E6FFF).withOpacity(0.18),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1E6FFF).withOpacity(0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.person_rounded,
-                            size: 16,
-                            color: Color(0xFF1E6FFF),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                '登录 / 注册',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1E6FFF),
-                                ),
-                              ),
-                              Text(
-                                '多端设备同步与设置',
-                                style: TextStyle(fontSize: 10, color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(
-                          Icons.arrow_forward_ios_rounded,
-                          size: 11,
-                          color: Color(0xFF1E6FFF),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Divider(height: 1, color: Theme.of(context).dividerColor.withOpacity(0.08)),
 
-          // 3. 导航手风琴区域 (我的设备 / 远程协助)
+          // 2. 导航手风琴区域 (我的设备 / 远程协助)
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 6),
               children: [
                 // 手风琴 1: 我的设备
                 InkWell(
+                  borderRadius: BorderRadius.circular(8),
                   onTap: () => setState(() => _expandMyDevices = !_expandMyDevices),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
@@ -335,75 +194,83 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                           ),
                         ),
                         const Spacer(),
-                        Icon(
-                          _expandMyDevices
-                              ? Icons.keyboard_arrow_down_rounded
-                              : Icons.keyboard_arrow_right_rounded,
-                          size: 16,
-                          color: Colors.grey,
+                        AnimatedRotation(
+                          turns: _expandMyDevices ? 0.25 : 0.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 11,
+                            color: Colors.grey,
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                if (_expandMyDevices)
-                  AnimatedBuilder(
-                    animation: gFFI.recentPeersModel,
-                    builder: (context, _) {
-                      final peers = gFFI.recentPeersModel.peers;
-                      return Column(
-                        children: [
-                          if (peers.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 4, 16, 6),
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  '暂无近期连接设备',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.grey.withOpacity(0.7),
-                                  ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeInOutCubic,
+                  child: _expandMyDevices
+                      ? AnimatedBuilder(
+                          animation: gFFI.recentPeersModel,
+                          builder: (context, _) {
+                            final peers = gFFI.recentPeersModel.peers;
+                            return Column(
+                              children: [
+                                if (peers.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(20, 6, 16, 8),
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        '暂无近期连接设备',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.withOpacity(0.7),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                else
+                                  ...peers.take(6).map((peer) {
+                                    final isSelected = _selectedNav == 'device_${peer.id}';
+                                    final name = peer.alias.isNotEmpty
+                                        ? peer.alias
+                                        : (peer.hostname.isNotEmpty ? peer.hostname : peer.id);
+                                    return _buildNavItem(
+                                      icon: Icons.laptop_windows_rounded,
+                                      title: name,
+                                      isSelected: isSelected,
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedNav = 'device_${peer.id}';
+                                          _selectedPeer = peer;
+                                        });
+                                      },
+                                    );
+                                  }),
+                                _buildNavItem(
+                                  icon: Icons.grid_view_rounded,
+                                  title: '全部设备',
+                                  isSelected: _selectedNav == 'all_devices',
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedNav = 'all_devices';
+                                    });
+                                  },
                                 ),
-                              ),
-                            )
-                          else
-                            ...peers.take(6).map((peer) {
-                              final isSelected = _selectedNav == 'device_${peer.id}';
-                              final name = peer.alias.isNotEmpty
-                                  ? peer.alias
-                                  : (peer.hostname.isNotEmpty ? peer.hostname : peer.id);
-                              return _buildNavItem(
-                                icon: Icons.laptop_windows_rounded,
-                                title: name,
-                                isSelected: isSelected,
-                                onTap: () {
-                                  setState(() {
-                                    _selectedNav = 'device_${peer.id}';
-                                    _selectedPeer = peer;
-                                  });
-                                },
-                              );
-                            }),
-                          _buildNavItem(
-                            icon: Icons.grid_view_rounded,
-                            title: '全部设备',
-                            isSelected: _selectedNav == 'all_devices',
-                            onTap: () {
-                              setState(() {
-                                _selectedNav = 'all_devices';
-                              });
-                            },
-                          ),
-                        ],
-                      );
-                    },
-                  ),
+                              ],
+                            );
+                          },
+                        )
+                      : const SizedBox(width: double.infinity, height: 0),
+                ),
 
                 const SizedBox(height: 6),
 
                 // 手风琴 2: 远程协助
                 InkWell(
+                  borderRadius: BorderRadius.circular(8),
                   onTap: () => setState(() => _expandRemoteAssist = !_expandRemoteAssist),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
@@ -420,39 +287,52 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                           ),
                         ),
                         const Spacer(),
-                        Icon(
-                          _expandRemoteAssist
-                              ? Icons.keyboard_arrow_down_rounded
-                              : Icons.keyboard_arrow_right_rounded,
-                          size: 16,
-                          color: Colors.grey,
+                        AnimatedRotation(
+                          turns: _expandRemoteAssist ? 0.25 : 0.0,
+                          duration: const Duration(milliseconds: 200),
+                          child: const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            size: 11,
+                            color: Colors.grey,
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
-                if (_expandRemoteAssist) ...[
-                  _buildNavItem(
-                    icon: Icons.play_circle_outline_rounded,
-                    title: '开始协助',
-                    isSelected: _selectedNav == 'remote_assist',
-                    onTap: () {
-                      setState(() {
-                        _selectedNav = 'remote_assist';
-                      });
-                    },
-                  ),
-                  _buildNavItem(
-                    icon: Icons.star_outline_rounded,
-                    title: '收藏设备',
-                    isSelected: _selectedNav == 'favorite_devices',
-                    onTap: () {
-                      setState(() {
-                        _selectedNav = 'favorite_devices';
-                      });
-                    },
-                  ),
-                ],
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeInOutCubic,
+                  child: _expandRemoteAssist
+                      ? Column(
+                          children: [
+                            _buildNavItem(
+                              icon: Icons.play_circle_outline_rounded,
+                              title: '开始协助',
+                              isSelected: _selectedNav == 'remote_assist',
+                              onTap: () {
+                                setState(() {
+                                  _selectedNav = 'remote_assist';
+                                });
+                              },
+                            ),
+                            _buildNavItem(
+                              icon: Icons.star_outline_rounded,
+                              title: '收藏设备',
+                              isSelected: _selectedNav == 'favorite_devices',
+                              onTap: () {
+                                setState(() {
+                                  _selectedNav = 'favorite_devices';
+                                });
+                              },
+                            ),
+                          ],
+                        )
+                      : const SizedBox(width: double.infinity, height: 0),
+                ),
+              ],
+            ),
+          ),
               ],
             ),
           ),
@@ -510,37 +390,56 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     required VoidCallback onTap,
   }) {
     const activeColor = Color(0xFF1E6FFF);
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      decoration: BoxDecoration(
-        color: isSelected ? activeColor.withOpacity(0.12) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: isSelected ? activeColor : Colors.grey,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected ? activeColor.withOpacity(0.12) : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isSelected ? activeColor.withOpacity(0.25) : Colors.transparent,
+                width: 1,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    color: isSelected ? activeColor : null,
+            ),
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 3,
+                  height: 14,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? activeColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+                Icon(
+                  icon,
+                  size: 16,
+                  color: isSelected ? activeColor : Colors.grey,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      color: isSelected ? activeColor : null,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -623,18 +522,22 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildRightPane(BuildContext context) {
+    Widget content;
     if (_selectedNav == 'remote_assist') {
-      return const DeskRemoteAssistView();
+      content = const DeskRemoteAssistView(key: ValueKey('remote_assist'));
     } else if (_selectedNav.startsWith('device_')) {
       if (_selectedPeer != null) {
-        return DeskDeviceDetailView(
+        content = DeskDeviceDetailView(
+          key: ValueKey('device_${_selectedPeer!.id}'),
           peer: _selectedPeer!,
           onPeerUpdated: () => setState(() {}),
         );
+      } else {
+        content = const DeskRemoteAssistView(key: ValueKey('remote_assist_fallback'));
       }
-      return const DeskRemoteAssistView();
     } else if (_selectedNav == 'all_devices' || _selectedNav == 'favorite_devices') {
-      return Container(
+      content = Container(
+        key: ValueKey(_selectedNav),
         color: Theme.of(context).scaffoldBackgroundColor,
         child: Column(
           children: [
@@ -660,8 +563,28 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           ],
         ),
       );
+    } else {
+      content = const DeskRemoteAssistView(key: ValueKey('default_assist'));
     }
-    return const DeskRemoteAssistView();
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.015, 0),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: content,
+    );
   }
 
   buildIDBoard(BuildContext context) {
