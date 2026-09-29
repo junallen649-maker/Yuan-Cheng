@@ -49,7 +49,7 @@ class _DeskRemoteAssistViewState extends State<DeskRemoteAssistView> {
 
   void _copyAndShare(String id, String password) {
     final cleanId = formatID(id);
-    final text = '【DESK远程】我的设备ID：$cleanId，临时验证码：$password';
+    final text = '【Polaris远程】我的设备ID：$cleanId，临时验证码：$password';
     Clipboard.setData(ClipboardData(text: text));
     showToast('已复制设备ID与验证码，可直接发送给伙伴');
   }

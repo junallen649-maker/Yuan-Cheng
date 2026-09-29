@@ -146,7 +146,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'DESK远程',
+                        'Polaris 远程',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -155,7 +155,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                         ),
                       ),
                       const Text(
-                        '高速安全 · 专线直连',
+                        'Polaris 高速安全 · 专线直连',
                         style: TextStyle(
                           fontSize: 10,
                           color: Colors.grey,
