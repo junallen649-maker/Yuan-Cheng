@@ -333,9 +333,6 @@ class _DesktopHomePageState extends State<DesktopHomePage>
               ],
             ),
           ),
-              ],
-            ),
-          ),
 
           // 4. 底部设置与网络状态
           Divider(height: 1, color: Theme.of(context).dividerColor.withOpacity(0.08)),
