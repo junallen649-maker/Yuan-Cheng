@@ -194,16 +194,6 @@ class _DeskAccountDialogState extends State<DeskAccountDialog> with SingleTicker
     gFFI.userModel.userName.value = email;
     Navigator.of(context).pop();
     showToast('登录成功！');
-    _showSetPasswordPrompt(email);
-  }
-
-  void _showSetPasswordPrompt(String email) {
-    Future.delayed(const Duration(milliseconds: 300), () {
-      showDialog(
-        context: context,
-        builder: (ctx) => _SetPasswordDialog(email: email),
-      );
-    });
   }
 
   @override

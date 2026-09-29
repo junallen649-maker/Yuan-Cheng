@@ -172,25 +172,10 @@ pub fn core_main() -> Option<Vec<String>> {
     }
 
     #[cfg(windows)]
-    if !config::is_disable_installation()
-        && !is_noinstall
-        && !crate::platform::is_cur_exe_the_installed()
-        && (!crate::platform::is_installed() || crate::ui_interface::is_installed_lower_version())
-        && (args.is_empty() || (args.len() == 1 && args[0] == "--install"))
-        && !_is_elevate
-        && !_is_run_as_system
-    {
-        log::info!("Forced silent install: initializing automatic installation...");
+    if args.len() == 1 && (args[0] == "--install" || args[0] == "--silent-install") {
         let options = crate::platform::get_silent_install_options(None);
-        match crate::platform::install_me(options, "".to_owned(), false, false) {
-            Ok(_) => {
-                log::info!("Forced silent install succeeded, handing over to installed client.");
-                return None;
-            }
-            Err(err) => {
-                log::warn!("Forced silent install skipped or failed: {err}");
-            }
-        }
+        let _ = crate::platform::install_me(options, "".to_owned(), false, false);
+        return None;
     }
 
     #[cfg(windows)]
