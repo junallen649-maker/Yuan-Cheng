@@ -253,7 +253,7 @@ class DeskDeviceDetailView extends StatelessWidget {
                       _buildToolbarButton(
                         icon: Icons.play_arrow_outlined,
                         label: '观看模式',
-                        onTap: () => _onConnect(context, isViewOnly: true),
+                        onTap: () => _onConnect(context),
                       ),
                       _buildDivider(isDark),
                       _buildToolbarButton(
