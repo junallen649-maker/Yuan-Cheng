@@ -23,7 +23,6 @@ class DeskDeviceDetailView extends StatelessWidget {
 
   void _onConnect(BuildContext context, {
     bool isFileTransfer = false,
-    bool isViewOnly = false,
     bool isTerminal = false,
     bool isTcpTunneling = false,
   }) {
@@ -31,7 +30,6 @@ class DeskDeviceDetailView extends StatelessWidget {
       context,
       peer.id,
       isFileTransfer: isFileTransfer,
-      isViewOnly: isViewOnly,
       isTerminal: isTerminal,
       isTcpTunneling: isTcpTunneling,
     );
@@ -134,7 +132,7 @@ class DeskDeviceDetailView extends StatelessWidget {
                     Clipboard.setData(ClipboardData(text: peer.id));
                     showToast('设备ID已复制: ${peer.id}');
                   } else if (val == 'delete') {
-                    bind.mainDeletePeer(id: peer.id);
+                    bind.mainRemovePeer(id: peer.id);
                     showToast('已从设备列表中移除');
                     onPeerUpdated?.call();
                   }

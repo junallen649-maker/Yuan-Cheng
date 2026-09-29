@@ -42,7 +42,7 @@ class _DeskRemoteAssistViewState extends State<DeskRemoteAssistView> {
       showToast(translate('Service is running'));
     } else {
       await bind.mainSetLocalOption(key: 'stop-service', value: 'Y');
-      await stop_service(true);
+      await start_service(false);
       showToast(translate('Service is stopped'));
     }
   }

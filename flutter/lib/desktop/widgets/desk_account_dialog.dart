@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_hbb/common.dart';
+import 'package:flutter_hbb/common.dart' hide Dialog;
 import 'package:flutter_hbb/common/hbbs/hbbs.dart';
 import 'package:flutter_hbb/models/platform_model.dart';
 import 'package:flutter_hbb/models/user_model.dart';
@@ -192,7 +192,6 @@ class _DeskAccountDialogState extends State<DeskAccountDialog> with SingleTicker
       await bind.mainSetLocalOption(key: 'user_info', value: jsonEncode({'name': email, 'email': email}));
     }
     gFFI.userModel.userName.value = email;
-    gFFI.userModel.email.value = email;
     Navigator.of(context).pop();
     showToast('登录成功！');
     _showSetPasswordPrompt(email);
