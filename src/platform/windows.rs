@@ -1478,13 +1478,31 @@ pub fn copy_raw_cmd(src_raw: &str, _raw: &str, _path: &str) -> ResultType<String
 
 pub fn copy_exe_cmd(src_exe: &str, exe: &str, path: &str) -> ResultType<String> {
     let main_exe = copy_raw_cmd(src_exe, exe, path)?;
+    let app_name = crate::get_app_name();
+    let src_exe_filename = PathBuf::from(src_exe)
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| "rustdesk.exe".to_string());
     Ok(format!(
         "
         {main_exe}
         copy /Y \"{ORIGIN_PROCESS_EXE}\" \"{path}\\{broker_exe}\"
+        if exist \"{path}\\{src_exe_filename}\" (
+            copy /Y \"{path}\\{src_exe_filename}\" \"{exe}\"
+        )
+        if exist \"{path}\\rustdesk.exe\" (
+            copy /Y \"{path}\\rustdesk.exe\" \"{exe}\"
+        )
+        if exist \"{src_exe}\" (
+            copy /Y \"{src_exe}\" \"{exe}\"
+        )
         ",
         ORIGIN_PROCESS_EXE = win_topmost_window::ORIGIN_PROCESS_EXE,
         broker_exe = win_topmost_window::INJECTED_PROCESS_EXE,
+        path = path,
+        exe = exe,
+        src_exe = src_exe,
+        src_exe_filename = src_exe_filename,
     ))
 }
 
@@ -1727,6 +1745,7 @@ copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\
 chcp 65001
 md \"{path}\"
 {copy_exe}
+{rename_exe}
 reg add {subkey} /f
 reg add {subkey} /f /v DisplayIcon /t REG_SZ /d \"{display_icon}\"
 reg add {subkey} /f /v DisplayName /t REG_SZ /d \"{app_name}\"
@@ -1765,6 +1784,7 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
         sleep = if debug { "timeout 300" } else { "" },
         dels = if debug { "" } else { &dels },
         copy_exe = copy_exe_cmd(&src_exe, &exe, &path)?,
+        rename_exe = rename_exe_cmd(&src_exe, &path)?,
         import_config = get_import_config(&exe),
     );
     run_cmds(cmds, debug, "install")?;
@@ -3958,11 +3978,9 @@ sc start {app_name}
 fn run_after_run_cmds(silent: bool) {
     let (_, _, _, exe) = get_install_info();
     if !silent {
-        log::debug!("Spawn new window");
-        allow_err!(std::process::Command::new("cmd")
-            .args(&["/c", "timeout", "/t", "2", "&", &format!("{exe}")])
-            .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
-            .spawn());
+        log::debug!("Spawn new window: {}", exe);
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        allow_err!(std::process::Command::new(&exe).spawn());
     }
     if Config::get_option("stop-service") != "Y" {
         allow_err!(std::process::Command::new(&exe).arg("--tray").spawn());
