@@ -810,14 +810,10 @@ fn import_config(path: &str) {
     let path2 = std::path::Path::new(&path2);
     let path = std::path::Path::new(path);
     log::info!("import config from {:?} and {:?}", path, path2);
-    let mut config: Config = load_path(path.into());
+    let config: Config = load_path(path.into());
     if config.is_empty() {
         log::info!("Empty source config, skipped");
         return;
-    }
-    if is_incoming_only() || config.options.get("client-role").map(|s| s.as_str()) == Some("agent") {
-        config.options.insert("client-role".to_string(), "agent".to_string());
-        config.options.insert("conn-type".to_string(), "incoming".to_string());
     }
     if get_modified_time(&path) > get_modified_time(&Config::file())
         && get_modified_time(&path) < get_exe_time()
@@ -826,7 +822,11 @@ fn import_config(path: &str) {
             log::info!("config written");
         }
     }
-    let config2: Config2 = load_path(path2.into());
+    let mut config2: Config2 = load_path(path2.into());
+    if is_incoming_only() || config2.options.get("client-role").map(|s| s.as_str()) == Some("agent") {
+        config2.options.insert("client-role".to_string(), "agent".to_string());
+        config2.options.insert("conn-type".to_string(), "incoming".to_string());
+    }
     if get_modified_time(&path2) > get_modified_time(&Config2::file()) {
         if store_path(Config2::file(), config2).is_err() {
             log::info!("config2 written");
