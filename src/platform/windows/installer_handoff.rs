@@ -146,7 +146,19 @@ pub(super) fn run_cmds(cmds: String, show: bool, tip: &str) -> ResultType<()> {
     let script = write_install_script(cmds)?;
     let cmd_path = get_system_executable(CMD_RELATIVE_PATH)?;
     let parameters = verified_install_parameters(&script)?;
-    let exit_code = run_elevated_and_wait(&cmd_path, &parameters, show)?;
+    let exit_code = if crate::platform::windows::is_elevated(None).unwrap_or(false) {
+        use ::windows::Win32::System::Threading;
+        use std::os::windows::process::CommandExt;
+        let mut command = std::process::Command::new(&cmd_path);
+        command.raw_arg(&parameters);
+        if !show {
+            command.creation_flags(Threading::CREATE_NO_WINDOW.0);
+        }
+        let status = command.status()?;
+        status.code().unwrap_or(-1) as u32
+    } else {
+        run_elevated_and_wait(&cmd_path, &parameters, show)?
+    };
     if exit_code != 0 {
         bail!(
             "{tip} failed with elevated exit code {exit_code}: {}",

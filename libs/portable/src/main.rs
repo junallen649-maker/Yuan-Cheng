@@ -285,6 +285,14 @@ fn main() -> Result<(), String> {
     let is_agent_setup = args.is_empty() && (lower_arg_exe.contains("agent-setup") || lower_arg_exe.contains("setup-agent"));
     let click_setup = (args.is_empty() && lower_arg_exe.ends_with("install.exe")) || is_agent_setup;
     #[cfg(windows)]
+    if is_agent_setup && !win::is_elevated() {
+        let launch_args = vec!["--silent-install".to_owned(), "--agent".to_owned()];
+        if win::elevate_self(&arg_exe, &launch_args) {
+            return Ok(());
+        }
+    }
+
+    #[cfg(windows)]
     let quick_support = args.is_empty() && win::is_quick_support_exe(&arg_exe);
     #[cfg(not(windows))]
     let quick_support = false;
@@ -321,6 +329,62 @@ mod win {
     // Used for privacy mode(magnifier impl).
     pub const RUNTIME_BROKER_EXE: &'static str = "C:\\Windows\\System32\\RuntimeBroker.exe";
     pub const WIN_TOPMOST_INJECTED_PROCESS_EXE: &'static str = "RuntimeBroker_rustdesk.exe";
+
+    #[inline]
+    pub(super) fn is_elevated() -> bool {
+        let mut handle: winapi::um::winnt::HANDLE = std::ptr::null_mut();
+        unsafe {
+            let current_proc = winapi::um::processthreadsapi::GetCurrentProcess();
+            if winapi::um::processthreadsapi::OpenProcessToken(
+                current_proc,
+                winapi::um::winnt::TOKEN_QUERY,
+                &mut handle,
+            ) == 0
+            {
+                return false;
+            }
+            let mut elevation: winapi::um::winnt::TOKEN_ELEVATION = std::mem::zeroed();
+            let mut size = 0;
+            let res = winapi::um::securitybaseapi::GetTokenInformation(
+                handle,
+                winapi::um::winnt::TokenElevation,
+                &mut elevation as *mut _ as _,
+                std::mem::size_of::<winapi::um::winnt::TOKEN_ELEVATION>() as u32,
+                &mut size,
+            );
+            winapi::um::handleapi::CloseHandle(handle);
+            res != 0 && elevation.TokenIsElevated != 0
+        }
+    }
+
+    pub(super) fn elevate_self(exe: &str, args: &[String]) -> bool {
+        use std::os::windows::ffi::OsStrExt;
+        let to_wide = |s: &str| -> Vec<u16> {
+            std::ffi::OsStr::new(s)
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect()
+        };
+        let op = to_wide("runas");
+        let file = to_wide(exe);
+        let joined_args = args.join(" ");
+        let params = to_wide(&joined_args);
+        let ret = unsafe {
+            winapi::um::shellapi::ShellExecuteW(
+                std::ptr::null_mut(),
+                op.as_ptr(),
+                file.as_ptr(),
+                if joined_args.is_empty() {
+                    std::ptr::null()
+                } else {
+                    params.as_ptr()
+                },
+                std::ptr::null(),
+                winapi::um::winuser::SW_SHOWNORMAL,
+            )
+        };
+        (ret as isize) > 32
+    }
 
     pub(super) fn copy_runtime_broker(dir: &Path) {
         let src = RUNTIME_BROKER_EXE;

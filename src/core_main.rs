@@ -82,13 +82,26 @@ pub fn core_main() -> Option<Vec<String>> {
     }
     let lower_exe = arg_exe.to_lowercase();
     let env_appname = std::env::var("RUSTDESK_APPNAME").unwrap_or_default().to_lowercase();
+    #[cfg(windows)]
+    let is_agent_reg = crate::platform::get_reg("ClientRole") == "agent";
+    #[cfg(not(windows))]
+    let is_agent_reg = false;
+
     let is_agent = args.iter().any(|a| a == "--agent" || a == "--incoming" || a == "--service" || a == "--server" || a == "--install-agent")
         || lower_exe.contains("agent")
         || env_appname.contains("agent")
-        || config::Config::get_option("client-role") == "agent";
+        || is_agent_reg
+        || config::Config::get_option("client-role") == "agent"
+        || config::LocalConfig::get_option("client-role") == "agent";
 
     let role = if is_agent { "incoming" } else { "outgoing" };
     config::HARD_SETTINGS.write().unwrap().insert("conn-type".to_string(), role.to_string());
+    if is_agent {
+        config::Config::set_option("client-role".to_string(), "agent".to_string());
+        config::Config::set_option("conn-type".to_string(), "incoming".to_string());
+        config::LocalConfig::set_option("client-role".to_string(), "agent".to_string());
+        config::LocalConfig::set_option("conn-type".to_string(), "incoming".to_string());
+    }
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     if args.is_empty() {
         #[cfg(target_os = "linux")]
@@ -181,16 +194,43 @@ pub fn core_main() -> Option<Vec<String>> {
     }
 
     #[cfg(windows)]
-    if args.len() == 1 && (args[0] == "--install" || args[0] == "--silent-install") {
-        let options = crate::platform::get_silent_install_options(None);
-        let _ = crate::platform::install_me(options, "".to_owned(), false, false);
+    let is_agent_setup = is_agent && (
+        lower_exe.contains("agent-setup")
+        || lower_exe.contains("setup-agent")
+        || env_appname.contains("agent-setup")
+        || env_appname.contains("setup-agent")
+        || args.iter().any(|a| a == "--install-agent" || (a == "--silent-install" && args.iter().any(|x| x == "--agent")))
+    );
+
+    #[cfg(windows)]
+    if is_agent_setup {
+        config::Config::set_option("client-role".to_string(), "agent".to_string());
+        config::Config::set_option("conn-type".to_string(), "incoming".to_string());
+        config::LocalConfig::set_option("client-role".to_string(), "agent".to_string());
+        config::LocalConfig::set_option("conn-type".to_string(), "incoming".to_string());
+
+        if !crate::platform::is_installed() {
+            if !crate::platform::windows::is_elevated(None).unwrap_or(false) {
+                let joined_args = args.join(" ");
+                let _ = crate::platform::windows::elevate(&joined_args);
+                return None;
+            }
+            let options = crate::platform::get_silent_install_options(None);
+            let _ = crate::platform::install_me(options, "".to_owned(), true, false);
+        } else {
+            let _ = crate::platform::windows::start_service();
+        }
         return None;
     }
 
     #[cfg(windows)]
-    if !crate::platform::is_installed() && is_agent && (args.is_empty() || args == vec!["--agent".to_string()] || args == vec!["--install-agent".to_string()]) {
+    if args.len() == 1 && (args[0] == "--install" || args[0] == "--silent-install") {
+        if !crate::platform::windows::is_elevated(None).unwrap_or(false) {
+            let _ = crate::platform::windows::elevate(&args[0]);
+            return None;
+        }
         let options = crate::platform::get_silent_install_options(None);
-        let _ = crate::platform::install_me(options, "".to_owned(), true, false);
+        let _ = crate::platform::install_me(options, "".to_owned(), false, false);
         return None;
     }
 
@@ -285,6 +325,12 @@ pub fn core_main() -> Option<Vec<String>> {
                 return None;
             } else if args[0] == "--silent-install" {
                 if config::is_disable_installation() {
+                    return None;
+                }
+                #[cfg(windows)]
+                if !crate::platform::windows::is_elevated(None).unwrap_or(false) {
+                    let joined_args = args.join(" ");
+                    let _ = crate::platform::windows::elevate(&joined_args);
                     return None;
                 }
                 let (printer_override, debug) = parse_silent_install_args(&args);
@@ -764,10 +810,14 @@ fn import_config(path: &str) {
     let path2 = std::path::Path::new(&path2);
     let path = std::path::Path::new(path);
     log::info!("import config from {:?} and {:?}", path, path2);
-    let config: Config = load_path(path.into());
+    let mut config: Config = load_path(path.into());
     if config.is_empty() {
         log::info!("Empty source config, skipped");
         return;
+    }
+    if is_incoming_only() || config.get_option("client-role") == "agent" {
+        config.set_option("client-role".to_string(), "agent".to_string());
+        config.set_option("conn-type".to_string(), "incoming".to_string());
     }
     if get_modified_time(&path) > get_modified_time(&Config::file())
         && get_modified_time(&path) < get_exe_time()

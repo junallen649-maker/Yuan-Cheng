@@ -1667,7 +1667,7 @@ pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> Res
     let mut reg_value_start_menu_shortcuts = "0".to_owned();
     let mut reg_value_printer = "0".to_owned();
     let mut shortcuts = Default::default();
-    if options.contains("desktopicon") {
+    if options.contains("desktopicon") && !config::is_incoming_only() {
         shortcuts = format!(
             "copy /Y \"{}\\{}.lnk\" \"%PUBLIC%\\Desktop\\\"",
             tmp_path,
@@ -1760,6 +1760,7 @@ reg add {subkey} /f /v VersionBuild /t REG_DWORD /d {version_build}
 reg add {subkey} /f /v UninstallString /t REG_SZ /d \"\\\"{nested_exe}\\\" --uninstall\"
 reg add {subkey} /f /v EstimatedSize /t REG_DWORD /d {size}
 reg add {subkey} /f /v WindowsInstaller /t REG_DWORD /d 0
+{role_reg}
 {mk_shortcut_commands}
 {uninstall_shortcut_commands}
 {tray_shortcuts}
@@ -1775,6 +1776,11 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
         nested_exe = escape_nested_cmd_ampersands(&exe),
         version = crate::VERSION.replace("-", "."),
         build_date = crate::BUILD_DATE,
+        role_reg = if config::is_incoming_only() {
+            format!("reg add {subkey} /f /v ClientRole /t REG_SZ /d \"agent\"\n")
+        } else {
+            "".to_owned()
+        },
         after_install = get_after_install(
             &exe,
             Some(reg_value_start_menu_shortcuts),
@@ -1787,6 +1793,12 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
         rename_exe = rename_exe_cmd(&src_exe, &path)?,
         import_config = get_import_config(&exe),
     );
+    if config::is_incoming_only() {
+        Config::set_option("client-role".into(), "agent".into());
+        Config::set_option("conn-type".into(), "incoming".into());
+        LocalConfig::set_option("client-role".into(), "agent".into());
+        LocalConfig::set_option("conn-type".into(), "incoming".into());
+    }
     run_cmds(cmds, debug, "install")?;
     run_after_run_cmds(silent);
     Ok(())
@@ -3967,8 +3979,9 @@ if exist \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{ap
 ", app_name = crate::get_app_name())
     } else {
         let exe = escape_nested_cmd_ampersands(exe);
+        let agent_arg = if config::is_incoming_only() { " --agent" } else { "" };
         format!("
-sc create {app_name} binpath= \"\\\"{exe}\\\" --service\" start= auto DisplayName= \"{app_name} Service\"
+sc create {app_name} binpath= \"\\\"{exe}\\\" --service{agent_arg}\" start= auto DisplayName= \"{app_name} Service\"
 sc start {app_name}
 ",
     app_name = crate::get_app_name())
@@ -4186,6 +4199,15 @@ pub fn is_service_running(service_name: &str) -> bool {
         let service_name = wide_string(service_name);
         is_service_running_w(service_name.as_ptr() as _)
     }
+}
+
+pub fn start_service() -> ResultType<()> {
+    let app_name = crate::get_app_name();
+    let _ = std::process::Command::new("sc")
+        .args(["start", &app_name])
+        .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
+        .output();
+    Ok(())
 }
 
 pub fn is_x64() -> bool {
