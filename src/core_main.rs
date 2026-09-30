@@ -815,9 +815,9 @@ fn import_config(path: &str) {
         log::info!("Empty source config, skipped");
         return;
     }
-    if is_incoming_only() || config.get_option("client-role") == "agent" {
-        config.set_option("client-role".to_string(), "agent".to_string());
-        config.set_option("conn-type".to_string(), "incoming".to_string());
+    if is_incoming_only() || config.options.get("client-role").map(|s| s.as_str()) == Some("agent") {
+        config.options.insert("client-role".to_string(), "agent".to_string());
+        config.options.insert("conn-type".to_string(), "incoming".to_string());
     }
     if get_modified_time(&path) > get_modified_time(&Config::file())
         && get_modified_time(&path) < get_exe_time()

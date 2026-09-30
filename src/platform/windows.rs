@@ -10,7 +10,7 @@ use hbb_common::{
     allow_err,
     anyhow::anyhow,
     bail,
-    config::{self, Config},
+    config::{self, Config, LocalConfig},
     libc::{c_int, wchar_t},
     log, sleep,
     sysinfo::{Pid, System},
