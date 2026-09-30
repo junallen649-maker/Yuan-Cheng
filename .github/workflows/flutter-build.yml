@@ -356,6 +356,8 @@ jobs:
           popd
           mkdir -p ./SignOutput
           cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/Polaris-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
+          cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/Polaris-Console-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
+          cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/Polaris-Agent-Setup-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
           mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
 
       - name: Add MSBuild to PATH

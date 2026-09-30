@@ -85,6 +85,7 @@ class _DeskRemoteAssistViewState extends State<DeskRemoteAssistView> {
     final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
     final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
     final primaryColor = const Color(0xFF1E6FFF);
+    final isOutgoingOnly = bind.isOutgoingOnly();
 
     return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
@@ -115,9 +116,9 @@ class _DeskRemoteAssistViewState extends State<DeskRemoteAssistView> {
                   // 页面大标题
                   Row(
                     children: [
-                      const Text(
-                        '远程协助',
-                        style: TextStyle(
+                      Text(
+                        isOutgoingOnly ? '远程控制中心' : '远程协助',
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.5,
@@ -131,7 +132,7 @@ class _DeskRemoteAssistViewState extends State<DeskRemoteAssistView> {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '专线极速直连',
+                          isOutgoingOnly ? '管理控制端' : '专线极速直连',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -143,241 +144,240 @@ class _DeskRemoteAssistViewState extends State<DeskRemoteAssistView> {
                   ),
                   const SizedBox(height: 20),
 
-                  // 卡片 1: 本设备受控面板
-                  _HoverElevationCard(
-                    isDark: isDark,
-                    cardBg: cardBg,
-                    borderColor: borderColor,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // 卡片标题栏：本设备 + 允许协助 Switch 开关
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF10B981),
-                                    shape: BoxShape.circle,
+                  // 卡片 1: 控制端概览看板 或 受控端卡片
+                  if (isOutgoingOnly)
+                    _buildConsoleAssetDashboard(
+                      context: context,
+                      isDark: isDark,
+                      cardBg: cardBg,
+                      borderColor: borderColor,
+                      primaryColor: primaryColor,
+                    )
+                  else
+                    _HoverElevationCard(
+                      isDark: isDark,
+                      cardBg: cardBg,
+                      borderColor: borderColor,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF10B981),
+                                      shape: BoxShape.circle,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  '本设备',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    '本设备受控端',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            Row(
-                              children: [
-                                Text(
-                                  '允许他人远程协助',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDark ? Colors.grey[300] : const Color(0xFF475569),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  Text(
+                                    '允许他人远程协助',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: isDark ? Colors.grey[300] : const Color(0xFF475569),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Obx(
-                                  () => Switch(
-                                    value: _allowRemoteControl.value,
-                                    activeColor: primaryColor,
-                                    onChanged: _toggleAllowRemote,
+                                  const SizedBox(width: 10),
+                                  Obx(
+                                    () => Switch(
+                                      value: _allowRemoteControl.value,
+                                      activeColor: primaryColor,
+                                      onChanged: _toggleAllowRemote,
+                                    ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 32),
-
-                        // 受控核心信息排版
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                // 列 1: 本设备 ID
-                                Expanded(
-                                  flex: 4,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '本设备ID',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      _HoverClickCopyWidget(
-                                        text: myId,
-                                        child: Text(
-                                          formattedId.isEmpty ? '--- --- ---' : formattedId,
-                                          style: const TextStyle(
-                                            fontSize: 28,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 1.5,
-                                            fontFamily: 'WorkSans',
+                                ],
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 32),
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              return Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Expanded(
+                                    flex: 4,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '本设备ID',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
                                           ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                // 列 2: 验证方式与临时密码
-                                Expanded(
-                                  flex: 5,
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '验证方式: 仅使用临时验证码',
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Row(
-                                        children: [
-                                          Obx(
-                                            () => Text(
-                                              _obscurePassword.value
-                                                  ? '••••••••'
-                                                  : (myPassword.isEmpty ? '------' : myPassword),
-                                              style: TextStyle(
-                                                fontSize: 22,
-                                                fontWeight: FontWeight.bold,
-                                                letterSpacing: _obscurePassword.value ? 4.0 : 1.2,
-                                              ),
+                                        const SizedBox(height: 8),
+                                        _HoverClickCopyWidget(
+                                          text: myId,
+                                          child: Text(
+                                            formattedId.isEmpty ? '--- --- ---' : formattedId,
+                                            style: const TextStyle(
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: 1.5,
+                                              fontFamily: 'WorkSans',
                                             ),
                                           ),
-                                          const SizedBox(width: 14),
-                                          // 密码眼睛明暗切换
-                                          Obx(
-                                            () => IconButton(
-                                              icon: Icon(
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Expanded(
+                                    flex: 5,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '验证方式: 仅使用临时验证码',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Obx(
+                                              () => Text(
                                                 _obscurePassword.value
-                                                    ? Icons.visibility_off_outlined
-                                                    : Icons.visibility_outlined,
-                                                size: 20,
-                                                color: Colors.grey,
-                                              ),
-                                              tooltip: _obscurePassword.value ? '查看密码' : '隐藏密码',
-                                              onPressed: () => _obscurePassword.toggle(),
-                                            ),
-                                          ),
-                                          // 刷新密码图标
-                                          AnimatedRotationWidget(
-                                            onPressed: () {
-                                              bind.mainUpdateTemporaryPassword();
-                                              showToast('已刷新临时验证码');
-                                            },
-                                            child: const Tooltip(
-                                              message: '刷新验证码',
-                                              child: Icon(
-                                                Icons.refresh,
-                                                size: 20,
-                                                color: Colors.grey,
+                                                    ? '••••••••'
+                                                    : (myPassword.isEmpty ? '------' : myPassword),
+                                                style: TextStyle(
+                                                  fontSize: 22,
+                                                  fontWeight: FontWeight.bold,
+                                                  letterSpacing: _obscurePassword.value ? 4.0 : 1.2,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                      Text(
-                                        '每次远控结束后可自动或手动刷新',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          color: isDark ? Colors.grey[500] : const Color(0xFF94A3B8),
+                                            const SizedBox(width: 14),
+                                            Obx(
+                                              () => IconButton(
+                                                icon: Icon(
+                                                  _obscurePassword.value
+                                                      ? Icons.visibility_off_outlined
+                                                      : Icons.visibility_outlined,
+                                                  size: 20,
+                                                  color: Colors.grey,
+                                                ),
+                                                tooltip: _obscurePassword.value ? '查看密码' : '隐藏密码',
+                                                onPressed: () => _obscurePassword.toggle(),
+                                              ),
+                                            ),
+                                            AnimatedRotationWidget(
+                                              onPressed: () {
+                                                bind.mainUpdateTemporaryPassword();
+                                                showToast('已刷新临时验证码');
+                                              },
+                                              child: const Tooltip(
+                                                message: '刷新验证码',
+                                                child: Icon(
+                                                  Icons.refresh,
+                                                  size: 20,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ),
-                                    ],
+                                        Text(
+                                          '每次远控结束后可自动或手动刷新',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDark ? Colors.grey[500] : const Color(0xFF94A3B8),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-
-                                // 列 3: 复制并分享按钮（带微交互动画反馈）
-                                Expanded(
-                                  flex: 3,
-                                  child: Align(
-                                    alignment: Alignment.centerRight,
-                                    child: Obx(() {
-                                      final copied = _isCopied.value;
-                                      return AnimatedContainer(
-                                        duration: const Duration(milliseconds: 220),
-                                        curve: Curves.easeOutCubic,
-                                        decoration: BoxDecoration(
-                                          color: copied
-                                              ? const Color(0xFF10B981).withOpacity(0.12)
-                                              : primaryColor.withOpacity(0.06),
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(
-                                            color: copied ? const Color(0xFF10B981) : primaryColor,
-                                            width: 1.2,
-                                          ),
-                                        ),
-                                        child: Material(
-                                          color: Colors.transparent,
-                                          child: InkWell(
+                                  Expanded(
+                                    flex: 3,
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: Obx(() {
+                                        final copied = _isCopied.value;
+                                        return AnimatedContainer(
+                                          duration: const Duration(milliseconds: 220),
+                                          curve: Curves.easeOutCubic,
+                                          decoration: BoxDecoration(
+                                            color: copied
+                                                ? const Color(0xFF10B981).withOpacity(0.12)
+                                                : primaryColor.withOpacity(0.06),
                                             borderRadius: BorderRadius.circular(10),
-                                            onTap: () => _copyAndShare(myId, myPassword),
-                                            child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  AnimatedSwitcher(
-                                                    duration: const Duration(milliseconds: 200),
-                                                    child: Icon(
-                                                      copied
-                                                          ? Icons.check_circle_rounded
-                                                          : Icons.share_outlined,
-                                                      key: ValueKey(copied),
-                                                      size: 18,
-                                                      color: copied
-                                                          ? const Color(0xFF10B981)
-                                                          : primaryColor,
+                                            border: Border.all(
+                                              color: copied ? const Color(0xFF10B981) : primaryColor,
+                                              width: 1.2,
+                                            ),
+                                          ),
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              borderRadius: BorderRadius.circular(10),
+                                              onTap: () => _copyAndShare(myId, myPassword),
+                                              child: Padding(
+                                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                                child: Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    AnimatedSwitcher(
+                                                      duration: const Duration(milliseconds: 200),
+                                                      child: Icon(
+                                                        copied
+                                                            ? Icons.check_circle_rounded
+                                                            : Icons.share_outlined,
+                                                        key: ValueKey(copied),
+                                                        size: 18,
+                                                        color: copied
+                                                            ? const Color(0xFF10B981)
+                                                            : primaryColor,
+                                                      ),
                                                     ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Text(
-                                                    copied ? '已复制分享' : '复制并分享',
-                                                    style: TextStyle(
-                                                      fontSize: 13,
-                                                      fontWeight: FontWeight.w600,
-                                                      color: copied
-                                                          ? const Color(0xFF10B981)
-                                                          : primaryColor,
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      copied ? '已复制分享' : '复制并分享',
+                                                      style: TextStyle(
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: copied
+                                                            ? const Color(0xFF10B981)
+                                                            : primaryColor,
+                                                      ),
                                                     ),
-                                                  ),
-                                                ],
+                                                  ],
+                                                ),
                                               ),
                                             ),
                                           ),
-                                        ),
-                                      );
-                                    }),
+                                        );
+                                      }),
+                                    ),
                                   ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ],
+                                ],
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 24),
 
-                  // 卡片 2: 远控伙伴设备主控面板
+                  // 卡片 2: 远控受控设备主控面板
                   _HoverElevationCard(
                     isDark: isDark,
                     cardBg: cardBg,
@@ -385,16 +385,18 @@ class _DeskRemoteAssistViewState extends State<DeskRemoteAssistView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          '远控伙伴设备',
-                          style: TextStyle(
+                        Text(
+                          isOutgoingOnly ? '发起远程控制' : '远控伙伴设备',
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '通过输入对方设备的【设备ID】即可发起远程协助连接',
+                          isOutgoingOnly
+                              ? '输入已授权的受控端设备ID即可快速建立安全远程桌面'
+                              : '通过输入对方设备的【设备ID】即可发起远程协助连接',
                           style: TextStyle(
                             fontSize: 13,
                             color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
@@ -403,7 +405,7 @@ class _DeskRemoteAssistViewState extends State<DeskRemoteAssistView> {
                         const Divider(height: 28),
 
                         Text(
-                          '伙伴的设备ID',
+                          isOutgoingOnly ? '受控设备 ID' : '伙伴的设备ID',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -433,16 +435,18 @@ class _DeskRemoteAssistViewState extends State<DeskRemoteAssistView> {
                                     fontFamily: 'WorkSans',
                                     letterSpacing: 1.0,
                                   ),
-                                  decoration: const InputDecoration(
-                                    hintText: '请输入伙伴设备ID (如 964 887 046)',
-                                    hintStyle: TextStyle(
+                                  decoration: InputDecoration(
+                                    hintText: isOutgoingOnly
+                                        ? '请输入受控端设备ID (如 964 887 046)'
+                                        : '请输入伙伴设备ID (如 964 887 046)',
+                                    hintStyle: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.normal,
                                       color: Colors.grey,
                                     ),
-                                    prefixIcon: Icon(Icons.computer_outlined, color: Colors.grey),
+                                    prefixIcon: const Icon(Icons.computer_outlined, color: Colors.grey),
                                     border: InputBorder.none,
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                                   ),
                                   onSubmitted: (_) => _onConnectPartner(),
                                 ),
@@ -464,6 +468,193 @@ class _DeskRemoteAssistViewState extends State<DeskRemoteAssistView> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildConsoleAssetDashboard({
+    required BuildContext context,
+    required bool isDark,
+    required Color cardBg,
+    required Color borderColor,
+    required Color primaryColor,
+  }) {
+    return AnimatedBuilder(
+      animation: gFFI.recentPeersModel,
+      builder: (context, _) {
+        final peers = gFFI.recentPeersModel.peers;
+        final totalCount = peers.length;
+        final onlineCount = peers.where((p) => p.online).length;
+
+        return _HoverElevationCard(
+          isDark: isDark,
+          cardBg: cardBg,
+          borderColor: borderColor,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        '受控设备概况',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.shield_outlined, size: 14, color: Color(0xFF10B981)),
+                        SizedBox(width: 4),
+                        Text(
+                          '专业控制端 · 安全就绪',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF10B981),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const Divider(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildMetricTile(
+                      isDark: isDark,
+                      title: '已授权受控设备',
+                      value: '$totalCount 台',
+                      icon: Icons.devices_rounded,
+                      color: primaryColor,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: _buildMetricTile(
+                      isDark: isDark,
+                      title: '实时在线被控端',
+                      value: '$onlineCount 台',
+                      icon: Icons.wifi_tethering_rounded,
+                      color: const Color(0xFF10B981),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: _buildMetricTile(
+                      isDark: isDark,
+                      title: '接入专线节点',
+                      value: '8.138.129.79',
+                      icon: Icons.hub_rounded,
+                      color: const Color(0xFF8B5CF6),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: isDark ? Colors.grey[400] : const Color(0xFF64748B)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '本客户端当前以独立控制端模式运行，本机受控端口已隔离。远程控制、文件传输与远程开机功能由控制端单向发起。',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMetricTile({
+    required bool isDark,
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.grey[400] : const Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

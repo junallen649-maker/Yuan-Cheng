@@ -281,7 +281,9 @@ fn main() -> Result<(), String> {
         }
         i += 1;
     }
-    let click_setup = args.is_empty() && arg_exe.to_lowercase().ends_with("install.exe");
+    let lower_arg_exe = arg_exe.to_lowercase();
+    let is_agent_setup = args.is_empty() && (lower_arg_exe.contains("agent-setup") || lower_arg_exe.contains("setup-agent"));
+    let click_setup = (args.is_empty() && lower_arg_exe.ends_with("install.exe")) || is_agent_setup;
     #[cfg(windows)]
     let quick_support = args.is_empty() && win::is_quick_support_exe(&arg_exe);
     #[cfg(not(windows))]
@@ -296,10 +298,16 @@ fn main() -> Result<(), String> {
         &args,
         &mut ui,
     ) {
-        if click_setup {
+        if is_agent_setup {
+            args = vec!["--silent-install".to_owned(), "--agent".to_owned()];
+        } else if click_setup {
             args = vec!["--install".to_owned()];
         } else if quick_support {
             args = vec!["--quick_support".to_owned()];
+        } else if lower_arg_exe.contains("agent") {
+            if !args.iter().any(|a| a == "--agent" || a == "--incoming") {
+                args.push("--agent".to_owned());
+            }
         }
         execute(exe, args, ui);
     }

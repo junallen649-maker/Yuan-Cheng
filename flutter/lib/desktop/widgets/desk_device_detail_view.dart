@@ -54,6 +54,10 @@ class DeskDeviceDetailView extends StatelessWidget {
         showToast('正在发送 Ctrl+Alt+Del 组合键...');
         _onConnect(context);
         break;
+      case 'wol':
+        bind.mainWol(id: peer.id);
+        showToast('已向受控设备 ${peer.id} 发送 Wake-on-LAN 远程唤醒数据包');
+        break;
       default:
         showToast('快捷指令已就绪');
         break;
@@ -123,16 +127,75 @@ class DeskDeviceDetailView extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
 
-                // 设备名称
+                // 设备名称与资产标识
                 Expanded(
-                  child: Text(
-                    displayName,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          displayName,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(6),
+                        onTap: () {
+                          Clipboard.setData(ClipboardData(text: peer.id));
+                          showToast('设备ID已复制: ${peer.id}');
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: borderColor,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'ID: ${peer.id}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: 'WorkSans',
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.grey[300] : const Color(0xFF475569),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(Icons.copy_rounded, size: 12, color: Colors.grey[500]),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (peer.platform.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            peer.platform,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
 
@@ -182,7 +245,8 @@ class DeskDeviceDetailView extends StatelessWidget {
               cardBg: cardBg,
               borderColor: borderColor,
               isDark: isDark,
-              onTap: () => _onConnect(context),
+              isOnline: isOnline,
+              onTap: isOnline ? () => _onConnect(context) : () => _sendQuickAction(context, 'wol'),
               toolbar: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
@@ -277,6 +341,12 @@ class DeskDeviceDetailView extends StatelessWidget {
                     color: const Color(0xFFF59E0B),
                     onTap: () => _sendQuickAction(context, 'cad'),
                   ),
+                  _InteractiveQuickChip(
+                    icon: Icons.power_settings_new_rounded,
+                    label: '远程开机 (WOL)',
+                    color: const Color(0xFF0284C7),
+                    onTap: () => _sendQuickAction(context, 'wol'),
+                  ),
                   // ➕ 添加卡片 (带交互微动效)
                   _InteractiveAddChip(
                     borderColor: borderColor,
@@ -339,6 +409,7 @@ class _InteractivePreviewCard extends StatefulWidget {
   final Color cardBg;
   final Color borderColor;
   final bool isDark;
+  final bool isOnline;
   final VoidCallback onTap;
   final Widget toolbar;
 
@@ -347,6 +418,7 @@ class _InteractivePreviewCard extends StatefulWidget {
     required this.cardBg,
     required this.borderColor,
     required this.isDark,
+    required this.isOnline,
     required this.onTap,
     required this.toolbar,
   }) : super(key: key);
@@ -444,14 +516,18 @@ class _InteractivePreviewCardState extends State<_InteractivePreviewCard> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.play_circle_fill,
-                              color: _isHovered ? const Color(0xFF60A5FA) : Colors.white,
+                              widget.isOnline ? Icons.play_circle_fill : Icons.power_settings_new_rounded,
+                              color: _isHovered
+                                  ? (widget.isOnline ? const Color(0xFF60A5FA) : const Color(0xFF38BDF8))
+                                  : (widget.isOnline ? Colors.white : const Color(0xFF7DD3FC)),
                               size: 24,
                             ),
                             const SizedBox(width: 10),
-                            const Text(
-                              '点击直接进入远程桌面',
-                              style: TextStyle(
+                            Text(
+                              widget.isOnline
+                                  ? '点击直接进入远程桌面'
+                                  : '设备当前离线 · 点击发送网络唤醒 (WOL)',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,

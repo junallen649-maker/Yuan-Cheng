@@ -80,6 +80,15 @@ pub fn core_main() -> Option<Vec<String>> {
         }
         i += 1;
     }
+    let lower_exe = arg_exe.to_lowercase();
+    let env_appname = std::env::var("RUSTDESK_APPNAME").unwrap_or_default().to_lowercase();
+    let is_agent = args.iter().any(|a| a == "--agent" || a == "--incoming" || a == "--service" || a == "--server" || a == "--install-agent")
+        || lower_exe.contains("agent")
+        || env_appname.contains("agent")
+        || config::Config::get_option("client-role") == "agent";
+
+    let role = if is_agent { "incoming" } else { "outgoing" };
+    config::HARD_SETTINGS.write().unwrap().insert("conn-type".to_string(), role.to_string());
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     if args.is_empty() {
         #[cfg(target_os = "linux")]
@@ -175,6 +184,13 @@ pub fn core_main() -> Option<Vec<String>> {
     if args.len() == 1 && (args[0] == "--install" || args[0] == "--silent-install") {
         let options = crate::platform::get_silent_install_options(None);
         let _ = crate::platform::install_me(options, "".to_owned(), false, false);
+        return None;
+    }
+
+    #[cfg(windows)]
+    if !crate::platform::is_installed() && is_agent && (args.is_empty() || args == vec!["--agent".to_string()] || args == vec!["--install-agent".to_string()]) {
+        let options = crate::platform::get_silent_install_options(None);
+        let _ = crate::platform::install_me(options, "".to_owned(), true, false);
         return None;
     }
 
@@ -281,13 +297,15 @@ pub fn core_main() -> Option<Vec<String>> {
                         translate("Installation failed!".to_string())
                     }
                 };
-                Toast::new(Toast::POWERSHELL_APP_ID)
-                    .title(&config::APP_NAME.read().unwrap())
-                    .text1(&text)
-                    .sound(Some(Sound::Default))
-                    .duration(Duration::Short)
-                    .show()
-                    .ok();
+                if !is_agent && !args.iter().any(|a| a == "--agent") {
+                    Toast::new(Toast::POWERSHELL_APP_ID)
+                        .title(&config::APP_NAME.read().unwrap())
+                        .text1(&text)
+                        .sound(Some(Sound::Default))
+                        .duration(Duration::Short)
+                        .show()
+                        .ok();
+                }
                 return None;
             } else if args[0] == "--uninstall-cert" {
                 #[cfg(windows)]

@@ -65,6 +65,33 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   final GlobalKey _childKey = GlobalKey();
 
   @override
+  void initState() {
+    super.initState();
+    _updateTimer = Timer.periodic(const Duration(seconds: 8), (_) {
+      if (mounted && bind.isOutgoingOnly()) {
+        final ids = gFFI.recentPeersModel.peers.map((e) => e.id).toList();
+        if (ids.isNotEmpty) {
+          bind.queryOnlines(ids: ids);
+        }
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && bind.isOutgoingOnly()) {
+        final ids = gFFI.recentPeersModel.peers.map((e) => e.id).toList();
+        if (ids.isNotEmpty) {
+          bind.queryOnlines(ids: ids);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _updateTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     super.build(context);
     final isIncomingOnly = bind.isIncomingOnly();
@@ -145,7 +172,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Polaris 远程',
+                        bind.isIncomingOnly() ? 'Polaris 受控端' : 'Polaris 控制台',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -153,9 +180,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                           letterSpacing: 0.5,
                         ),
                       ),
-                      const Text(
-                        'Polaris 高速安全 · 专线直连',
-                        style: TextStyle(
+                      Text(
+                        bind.isIncomingOnly()
+                            ? '受控服务运行中 · 8.138.129.79'
+                            : 'Polaris 资产管理与远程控制',
+                        style: const TextStyle(
                           fontSize: 10,
                           color: Colors.grey,
                         ),
@@ -241,6 +270,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                                       icon: Icons.laptop_windows_rounded,
                                       title: name,
                                       isSelected: isSelected,
+                                      isOnline: peer.online,
                                       onTap: () {
                                         setState(() {
                                           _selectedNav = 'device_${peer.id}';
@@ -385,6 +415,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     required String title,
     required bool isSelected,
     required VoidCallback onTap,
+    bool? isOnline,
   }) {
     const activeColor = Color(0xFF1E6FFF);
     return Padding(
@@ -424,6 +455,17 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                   color: isSelected ? activeColor : Colors.grey,
                 ),
                 const SizedBox(width: 8),
+                if (isOnline != null) ...[
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      color: isOnline ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 Expanded(
                   child: Text(
                     title,
