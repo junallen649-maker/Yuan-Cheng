@@ -81,7 +81,7 @@ def make_parser():
         help='Connection type, e.g. "incoming", "outgoing". Default is empty, means incoming-outgoing',
     )
     parser.add_argument(
-        "--app-name", type=str, default="RustDesk", help="The app name."
+        "--app-name", type=str, default="Polaris", help="The app name."
     )
     parser.add_argument(
         "-v", "--version", type=str, default="", help="The app version."
