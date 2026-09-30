@@ -65,33 +65,6 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   final GlobalKey _childKey = GlobalKey();
 
   @override
-  void initState() {
-    super.initState();
-    _updateTimer = Timer.periodic(const Duration(seconds: 8), (_) {
-      if (mounted && bind.isOutgoingOnly()) {
-        final ids = gFFI.recentPeersModel.peers.map((e) => e.id).toList();
-        if (ids.isNotEmpty) {
-          bind.queryOnlines(ids: ids);
-        }
-      }
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && bind.isOutgoingOnly()) {
-        final ids = gFFI.recentPeersModel.peers.map((e) => e.id).toList();
-        if (ids.isNotEmpty) {
-          bind.queryOnlines(ids: ids);
-        }
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _updateTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     super.build(context);
     final isIncomingOnly = bind.isIncomingOnly();
@@ -1187,6 +1160,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     });
     Get.put<RxBool>(svcStopped, tag: 'stop-service');
     rustDeskWinManager.registerActiveWindowListener(onActiveWindowChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && bind.isOutgoingOnly()) {
+        final ids = gFFI.recentPeersModel.peers.map((e) => e.id).toList();
+        if (ids.isNotEmpty) {
+          bind.queryOnlines(ids: ids);
+        }
+      }
+    });
 
     screenToMap(window_size.Screen screen) => {
           'frame': {
