@@ -1,11 +1,11 @@
 [Desktop Entry]
-Name=RustDesk
+Name=Polaris
 NoDisplay=true
-MimeType=x-scheme-handler/rustdesk;
-TryExec=rustdesk
-Exec=rustdesk %u
-Icon=rustdesk
+MimeType=x-scheme-handler/polaris;
+TryExec=polaris
+Exec=polaris %u
+Icon=polaris
 Terminal=false
 Type=Application
 StartupNotify=false
-StartupWMClass=rustdesk
+StartupWMClass=polaris

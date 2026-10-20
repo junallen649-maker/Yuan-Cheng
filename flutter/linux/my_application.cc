@@ -33,7 +33,7 @@ extern bool gIsConnectionManager;
 // Flutter's Linux embedder doesn't deliver X11 button 8/9 events to Dart.
 // We intercept them via GDK and forward through a dedicated platform channel.
 
-static const char* kSideButtonChannelName = "org.rustdesk.rustdesk/side_buttons";
+static const char* kSideButtonChannelName = "org.polaris.polaris/side_buttons";
 
 static gboolean on_side_button_event(GtkWidget* widget, GdkEventButton* event, gpointer user_data) {
   if (event->button != 8 && event->button != 9) {
@@ -116,7 +116,10 @@ static void my_application_activate(GApplication* application) {
   GtkIconTheme* theme = gtk_icon_theme_get_default();
   gint icons[4] = {256, 128, 64, 32};
   for (int i = 0; i < 4; i++) {
-    GdkPixbuf* icon = gtk_icon_theme_load_icon(theme, "rustdesk", icons[i], GTK_ICON_LOOKUP_NO_SVG, NULL);
+    GdkPixbuf* icon = gtk_icon_theme_load_icon(theme, "polaris", icons[i], GTK_ICON_LOOKUP_NO_SVG, NULL);
+    if (icon == nullptr) {
+      icon = gtk_icon_theme_load_icon(theme, "rustdesk", icons[i], GTK_ICON_LOOKUP_NO_SVG, NULL);
+    }
     if (icon != nullptr) {
       gtk_window_set_icon(window, icon);
     }
@@ -142,11 +145,11 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "rustdesk");
+    gtk_header_bar_set_title(header_bar, "Polaris");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "rustdesk");
+    gtk_window_set_title(window, "Polaris");
   }
 
   // auto bdw = bitsdojo_window_from(window); // <--- add this line
@@ -182,7 +185,7 @@ static void my_application_activate(GApplication* application) {
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
   self->host_channel = fl_method_channel_new(
     fl_engine_get_binary_messenger(fl_view_get_engine(view)),
-    "org.rustdesk.rustdesk/host",
+    "org.polaris.polaris/host",
     FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(
     self->host_channel,

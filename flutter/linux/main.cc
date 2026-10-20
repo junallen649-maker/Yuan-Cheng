@@ -5,16 +5,13 @@
 #include <unistd.h>
 #include "my_application.h"
 
+#define POLARIS_LIB_PATH "libpolaris.so"
 #define RUSTDESK_LIB_PATH "librustdesk.so"
-typedef bool (*RustDeskCoreMain)();
+typedef bool (*CoreMainFunc)();
 bool gIsConnectionManager = false;
 
 void print_help_install_pkg(const char* so);
 
-// The bundle keeps the core library at lib/librustdesk.so next to the
-// executable. Resolve that path explicitly instead of relying on the
-// runner's RPATH, which repackaged installs may strip.
-// https://github.com/rustdesk/rustdesk/discussions/14407
 static void* dlopen_bundled_lib() {
   char exe_path[PATH_MAX];
   ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
@@ -23,26 +20,29 @@ static void* dlopen_bundled_lib() {
   char* last_slash = strrchr(exe_path, '/');
   if (last_slash == nullptr) return nullptr;
   *last_slash = '\0';
-  char lib_path[PATH_MAX + sizeof("/lib/" RUSTDESK_LIB_PATH)];
-  snprintf(lib_path, sizeof(lib_path), "%s/lib/%s", exe_path, RUSTDESK_LIB_PATH);
-  if (access(lib_path, F_OK) != 0) return nullptr;
-  void* librustdesk = dlopen(lib_path, RTLD_LAZY);
-  if (!librustdesk) {
-    char* error = dlerror();
-    if (error != nullptr) {
-      fprintf(stderr, "Failed to load \"%s\": %s\n", lib_path, error);
+
+  const char* lib_names[] = {POLARIS_LIB_PATH, RUSTDESK_LIB_PATH};
+  for (const char* name : lib_names) {
+    char lib_path[PATH_MAX + 64];
+    snprintf(lib_path, sizeof(lib_path), "%s/lib/%s", exe_path, name);
+    if (access(lib_path, F_OK) == 0) {
+      void* lib = dlopen(lib_path, RTLD_LAZY);
+      if (lib) return lib;
     }
   }
-  return librustdesk;
+  return nullptr;
 }
 
-bool flutter_rustdesk_core_main() {
-   void* librustdesk = dlopen_bundled_lib();
-   if (!librustdesk) {
-      librustdesk = dlopen(RUSTDESK_LIB_PATH, RTLD_LAZY);
+bool flutter_polaris_core_main() {
+   void* lib = dlopen_bundled_lib();
+   if (!lib) {
+      lib = dlopen(POLARIS_LIB_PATH, RTLD_LAZY);
    }
-   if (!librustdesk) {
-      fprintf(stderr,"Failed to load \"librustdesk.so\"\n");
+   if (!lib) {
+      lib = dlopen(RUSTDESK_LIB_PATH, RTLD_LAZY);
+   }
+   if (!lib) {
+      fprintf(stderr,"Failed to load \"%s\" or \"%s\"\n", POLARIS_LIB_PATH, RUSTDESK_LIB_PATH);
       char* error;
       if ((error = dlerror()) != nullptr) {
         fprintf(stderr, "%s\n", error);
@@ -56,17 +56,20 @@ bool flutter_rustdesk_core_main() {
       }
      return false;
    }
-   auto core_main = (RustDeskCoreMain) dlsym(librustdesk,"rustdesk_core_main");
-   char* error;
-   if ((error = dlerror()) != nullptr) {
-       fprintf(stderr, "Program entry \"rustdesk_core_main\" is not found: %s\n", error);
+   auto core_main = (CoreMainFunc) dlsym(lib, "polaris_core_main");
+   if (!core_main) {
+       core_main = (CoreMainFunc) dlsym(lib, "rustdesk_core_main");
+   }
+   if (!core_main) {
+       char* error = dlerror();
+       fprintf(stderr, "Program entry \"polaris_core_main\" is not found: %s\n", error ? error : "unknown");
        return false;
    }
    return core_main();
 }
 
 int main(int argc, char** argv) {
-  if (!flutter_rustdesk_core_main()) {
+  if (!flutter_polaris_core_main()) {
       return 0;
   }
   for (int i = 0; i < argc; i++) {

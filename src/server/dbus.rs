@@ -10,7 +10,7 @@ use hbb_common::log;
 use std::collections::HashMap;
 use std::{error::Error, fmt, time::Duration};
 
-const DBUS_NAME: &str = "org.rustdesk.rustdesk";
+const DBUS_NAME: &str = "org.polaris.polaris";
 const DBUS_PREFIX: &str = "/dbus";
 const DBUS_METHOD_NEW_CONNECTION: &str = "NewConnection";
 const DBUS_METHOD_NEW_CONNECTION_ID: &str = "id";
@@ -23,7 +23,7 @@ struct DbusError(String);
 
 impl fmt::Display for DbusError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "RustDesk DBus Error: {}", self.0)
+        write!(f, "Polaris DBus Error: {}", self.0)
     }
 }
 

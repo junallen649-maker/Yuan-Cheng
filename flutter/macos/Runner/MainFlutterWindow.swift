@@ -55,15 +55,19 @@ class MainFlutterWindow: NSWindow {
         )
     }
 
+@_silgen_name("polaris_core_main")
+func polaris_core_main() -> Bool
+
+class MainFlutterWindow: NSWindow {
     override func awakeFromNib() {
-        rustdesk_core_main();
+        _ = polaris_core_main();
         _ = MainFlutterWindow.fullscreenObserver
         let flutterViewController = FlutterViewController.init()
         let windowFrame = self.frame
         self.contentViewController = flutterViewController
         self.setFrame(windowFrame, display: true)
         // register self method handler
-        let registrar = flutterViewController.registrar(forPlugin: "RustDeskPlugin")
+        let registrar = flutterViewController.registrar(forPlugin: "PolarisPlugin")
         setMethodHandler(registrar: registrar)
 
         RegisterGeneratedPlugins(registry: flutterViewController)
@@ -72,7 +76,7 @@ class MainFlutterWindow: NSWindow {
             // Register the plugin which you want access from other isolate.
             // DesktopLifecyclePlugin.register(with: controller.registrar(forPlugin: "DesktopLifecyclePlugin"))
             // Note: copy below from above RegisterGeneratedPlugins
-            self.setMethodHandler(registrar: controller.registrar(forPlugin: "RustDeskPlugin"))
+            self.setMethodHandler(registrar: controller.registrar(forPlugin: "PolarisPlugin"))
             DesktopDropPlugin.register(with: controller.registrar(forPlugin: "DesktopDropPlugin"))
             DeviceInfoPlusMacosPlugin.register(with: controller.registrar(forPlugin: "DeviceInfoPlusMacosPlugin"))
             FlutterCustomCursorPlugin.register(with: controller.registrar(forPlugin: "FlutterCustomCursorPlugin"))
@@ -113,7 +117,7 @@ class MainFlutterWindow: NSWindow {
         // Do this FIRST before setting any state
         let result = CGAssociateMouseAndMouseCursorPosition(0)
         if result != CGError.success {
-            NSLog("[RustDesk] Failed to dissociate mouse from cursor position: %d", result.rawValue)
+            NSLog("[Polaris] Failed to dissociate mouse from cursor position: %d", result.rawValue)
             return false
         }
 
@@ -155,7 +159,7 @@ class MainFlutterWindow: NSWindow {
 
         // Check if monitor was created successfully
         if state.eventMonitor == nil {
-            NSLog("[RustDesk] Failed to create event monitor for relative mouse mode")
+            NSLog("[Polaris] Failed to create event monitor for relative mouse mode")
             // Re-associate mouse since we failed
             CGAssociateMouseAndMouseCursorPosition(1)
             state.deltaChannel = nil
@@ -187,19 +191,19 @@ class MainFlutterWindow: NSWindow {
         // Re-associate mouse with cursor position (non-blocking with async retry)
         let result = CGAssociateMouseAndMouseCursorPosition(1)
         if result != CGError.success {
-            NSLog("[RustDesk] Failed to re-associate mouse with cursor position: %d, scheduling retry...", result.rawValue)
+            NSLog("[Polaris] Failed to re-associate mouse with cursor position: %d, scheduling retry...", result.rawValue)
             // Non-blocking retry after 50ms
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 let retryResult = CGAssociateMouseAndMouseCursorPosition(1)
                 if retryResult != CGError.success {
-                    NSLog("[RustDesk] Retry failed to re-associate mouse: %d. Cursor may remain locked.", retryResult.rawValue)
+                    NSLog("[Polaris] Retry failed to re-associate mouse: %d. Cursor may remain locked.", retryResult.rawValue)
                 }
             }
         }
     }
 
     public func setMethodHandler(registrar: FlutterPluginRegistrar) {
-        let channel = FlutterMethodChannel(name: "org.rustdesk.rustdesk/host", binaryMessenger: registrar.messenger)
+        let channel = FlutterMethodChannel(name: "org.polaris.polaris/host", binaryMessenger: registrar.messenger)
         channel.setMethodCallHandler({
             (call, result) -> Void in
                 switch call.method {

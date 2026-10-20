@@ -578,4 +578,6 @@ class RustDeskMultiWindowManager {
   }
 }
 
+typedef PolarisMultiWindowManager = RustDeskMultiWindowManager;
 final rustDeskWinManager = RustDeskMultiWindowManager.instance;
+final polarisWinManager = rustDeskWinManager;

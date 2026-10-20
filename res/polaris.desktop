@@ -1,0 +1,19 @@
+[Desktop Entry]
+Name=Polaris
+GenericName=Remote Desktop
+Comment=Polaris Remote Desktop
+Exec=polaris %u
+Icon=polaris
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=Network;RemoteAccess;GTK;
+Keywords=internet;linux;remote-control;p2p;remote-desktop;polaris;
+Actions=new-window;
+StartupWMClass=polaris
+
+X-Desktop-File-Install-Version=0.23
+
+[Desktop Action new-window]
+Name=Open a New Window
+Exec=polaris %u

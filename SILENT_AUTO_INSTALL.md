@@ -36,16 +36,16 @@ sequenceDiagram
     
     alt 用户点击“是” (允许安装)
         UAC->>System: 执行高权限安装脚本 (隐藏控制台窗口)
-        System->>System: 1. 复制所有核心文件至 C:\Program Files\RustDesk
-        System->>System: 2. 注册 Windows 服务 (sc create RustDesk start= auto)
-        System->>System: 3. 立即启动系统服务 (sc start RustDesk)
+        System->>System: 1. 复制所有核心文件至 C:\Program Files\Polaris
+        System->>System: 2. 注册 Windows 服务 (sc create Polaris start= auto)
+        System->>System: 3. 立即启动系统服务 (sc start Polaris)
         System->>System: 4. 创建桌面/开始菜单快捷方式
         System->>System: 5. 写入启动项快捷方式 (Startup 目录)
         System->>System: 6. 配置防火墙出入站放行规则
         System-->>Portable: 安装脚本执行完毕 (ExitCode = 0)
-        Portable->>System: 延时 2 秒触发启动 Program Files\RustDesk.exe
+        Portable->>System: 延时 2 秒触发启动 Program Files\Polaris.exe
         Portable->>Portable: 临时解压进程退出 (return None)
-        System->>Installed: 启动安装目录下的 RustDesk.exe
+        System->>Installed: 启动安装目录下的 Polaris.exe
         Installed->>Installed: 检测状态 (is_installed = true)
         Installed->>User: 显示干净整洁的远程控制主界面 (无粉色安装卡片)
     else 用户点击“否” (拒绝提权)
@@ -112,15 +112,15 @@ sequenceDiagram
 
 ### 2. 验证 Windows 系统服务与开机自启
 按 `Win + R` 打开运行窗口，输入 `services.msc` 回车：
-1. 在服务列表中找到 **`RustDesk Service`**（或对应自定义品牌名服务）；
+1. 在服务列表中找到 **`Polaris Service`**（或对应自定义品牌名服务）；
 2. 检查其属性：
    - **启动类型**：自动（`Automatic`）；
    - **服务状态**：正在运行（`Running`）；
-   - **可执行文件路径**：指向 `C:\Program Files\RustDesk\RustDesk.exe --service`。
+   - **可执行文件路径**：指向 `C:\Program Files\Polaris\Polaris.exe --service`。
 
 ### 3. 验证托盘开机启动项
 按 `Win + R` 输入 `shell:common startup` 回车打开公共启动文件夹：
-- 确认文件夹内存在 `RustDesk Tray.lnk`（托盘启动快捷方式）。
+- 确认文件夹内存在 `Polaris Tray.lnk`（托盘启动快捷方式）。
 
 ### 4. 重启测试（无需登录验证远程连接）
 1. 重启该 Windows 电脑；

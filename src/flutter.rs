@@ -104,6 +104,12 @@ fn load_plugin_in_app_path(dll_name: &str) -> Result<Library, LibError> {
 /// Return true if the app should continue running with UI(possibly Flutter), false if the app should exit.
 #[cfg(not(windows))]
 #[no_mangle]
+pub extern "C" fn polaris_core_main() -> bool {
+    rustdesk_core_main()
+}
+
+#[cfg(not(windows))]
+#[no_mangle]
 pub extern "C" fn rustdesk_core_main() -> bool {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
@@ -134,6 +140,12 @@ pub extern "C" fn handle_applicationShouldOpenUntitledFile() {
 
 #[cfg(windows)]
 #[no_mangle]
+pub extern "C" fn polaris_core_main_args(args_len: *mut c_int) -> *mut *mut c_char {
+    rustdesk_core_main_args(args_len)
+}
+
+#[cfg(windows)]
+#[no_mangle]
 pub extern "C" fn rustdesk_core_main_args(args_len: *mut c_int) -> *mut *mut c_char {
     unsafe { std::ptr::write(args_len, 0) };
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -145,6 +157,12 @@ pub extern "C" fn rustdesk_core_main_args(args_len: *mut c_int) -> *mut *mut c_c
     }
     #[cfg(any(target_os = "android", target_os = "ios"))]
     return std::ptr::null_mut() as _;
+}
+
+#[cfg(windows)]
+#[no_mangle]
+pub extern "C" fn polaris_is_disable_installation() -> c_int {
+    rustdesk_is_disable_installation()
 }
 
 #[cfg(windows)]
@@ -201,6 +219,12 @@ pub unsafe extern "C" fn free_c_args(ptr: *mut *mut c_char, len: c_int) {
     }
 
     // Afterwards the vector will be dropped and thus freed.
+}
+
+#[cfg(windows)]
+#[no_mangle]
+pub unsafe extern "C" fn get_polaris_app_name(buffer: *mut u16, length: i32) -> i32 {
+    get_rustdesk_app_name(buffer, length)
 }
 
 #[cfg(windows)]

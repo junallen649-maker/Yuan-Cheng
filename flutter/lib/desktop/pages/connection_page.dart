@@ -40,14 +40,6 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
   double get em => 14.0;
   double? get height => bind.isIncomingOnly() ? null : em * 3;
 
-  void onUsePublicServerGuide() {
-    const url = "https://rustdesk.com/pricing";
-    canLaunchUrlString(url).then((can) {
-      if (can) {
-        launchUrlString(url);
-      }
-    });
-  }
 
   @override
   void initState() {
@@ -78,36 +70,45 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
               .marginOnly(left: em),
         );
 
-    setupServerWidget() => Flexible(
-          child: Offstage(
-            offstage: !(!_svcStopped.value &&
-                stateGlobal.svcStatus.value == SvcStatus.ready &&
-                _svcIsUsingPublicServer.value),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(', ', style: TextStyle(fontSize: em)),
-                Flexible(
-                  child: InkWell(
-                    onTap: onUsePublicServerGuide,
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            translate('setup_server_tip'),
-                            style: TextStyle(
-                                decoration: TextDecoration.underline,
-                                fontSize: em),
-                          ),
-                        ),
-                      ],
+    installButtonWidget() => (isWindows && !bind.isDisableInstallation() && !bind.mainIsInstalled())
+        ? InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () async {
+              await rustDeskWinManager.closeAllSubWindows();
+              bind.mainGotoInstall();
+            },
+            child: Container(
+              margin: EdgeInsets.only(left: 10),
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E6FFF),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF1E6FFF).withOpacity(0.35),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.install_desktop_rounded, size: 13, color: Colors.white),
+                  const SizedBox(width: 4),
+                  Text(
+                    translate("Install"),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                )
-              ],
+                ],
+              ),
             ),
-          ),
-        );
+          )
+        : const SizedBox();
 
     basicWidget() => Row(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -121,8 +122,17 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
                         stateGlobal.svcStatus.value == SvcStatus.connecting
                     ? kColorWarn
                     : (stateGlobal.svcStatus.value == SvcStatus.ready
-                        ? Color.fromARGB(255, 50, 190, 166)
-                        : Color.fromARGB(255, 224, 79, 95)),
+                        ? const Color(0xFF1E6FFF)
+                        : const Color.fromARGB(255, 224, 79, 95)),
+                boxShadow: stateGlobal.svcStatus.value == SvcStatus.ready
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFF1E6FFF).withOpacity(0.6),
+                          blurRadius: 4,
+                          spreadRadius: 1,
+                        )
+                      ]
+                    : null,
               ),
             ).marginSymmetric(horizontal: em),
             Container(
@@ -131,9 +141,8 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
             ),
             // stop
             if (!isIncomingOnly) startServiceWidget(),
-            // ready && public
-            // No need to show the guide if is custom client.
-            if (!isIncomingOnly) setupServerWidget(),
+            // install button when uninstalled
+            installButtonWidget(),
           ],
         );
 

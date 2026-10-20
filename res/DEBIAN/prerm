@@ -5,13 +5,13 @@ set -e
 case $1 in
     remove|upgrade)
 		INITSYS=$(ls -al /proc/1/exe | awk -F' ' '{print $NF}' | awk -F'/' '{print $NF}')
-		rm -f /usr/bin/rustdesk
+		rm -f /usr/bin/polaris /usr/bin/rustdesk
 		
 		if [ "systemd" == "${INITSYS}" ]; then
 
-			systemctl stop rustdesk || true
-			systemctl disable rustdesk || true
-			rm /etc/systemd/system/rustdesk.service /usr/lib/systemd/system/rustdesk.service || true
+			systemctl stop polaris 2>/dev/null || systemctl stop rustdesk || true
+			systemctl disable polaris 2>/dev/null || systemctl disable rustdesk || true
+			rm -f /etc/systemd/system/polaris.service /usr/lib/systemd/system/polaris.service /etc/systemd/system/rustdesk.service /usr/lib/systemd/system/rustdesk.service || true
 			
 			# workaround temp dev build between 1.1.9 and 1.2.0
 			serverUser=$(ps -ef | grep -E 'rustdesk +--server' | grep -v 'sudo ' | awk '{print $1}' | head -1)

@@ -25,21 +25,23 @@ typedef F3 = Pointer<Uint8> Function(Pointer<Utf8>, int);
 typedef F3Dart = Pointer<Uint8> Function(Pointer<Utf8>, Int32);
 typedef HandleEvent = Future<void> Function(Map<String, dynamic> evt);
 
-/// The Linux bundle keeps the core library at lib/librustdesk.so next to the
-/// executable. Prefer that copy, mirroring flutter/linux/main.cc: the plain
-/// name relies on the loader search path, which repackaged installs may not
-/// cover. https://github.com/rustdesk/rustdesk/discussions/14407
 DynamicLibrary _openLinuxCoreLib() {
-  final bundled =
-      '${File(Platform.resolvedExecutable).parent.path}/lib/librustdesk.so';
-  try {
-    if (File(bundled).existsSync()) {
-      return DynamicLibrary.open(bundled);
+  for (final name in ['libpolaris.so', 'librustdesk.so']) {
+    final bundled =
+        '${File(Platform.resolvedExecutable).parent.path}/lib/$name';
+    try {
+      if (File(bundled).existsSync()) {
+        return DynamicLibrary.open(bundled);
+      }
+    } catch (e) {
+      debugPrint("Failed to load '$bundled': $e");
     }
-  } catch (e) {
-    debugPrint("Failed to load '$bundled': $e");
   }
-  return DynamicLibrary.open('librustdesk.so');
+  try {
+    return DynamicLibrary.open('libpolaris.so');
+  } catch (_) {
+    return DynamicLibrary.open('librustdesk.so');
+  }
 }
 
 /// FFI wrapper around the native Rust core.
@@ -135,17 +137,29 @@ class PlatformFFI {
   Future<void> init(String appType) async {
     _appType = appType;
     final dylib = isAndroid
-        ? DynamicLibrary.open('librustdesk.so')
+        ? () {
+            try {
+              return DynamicLibrary.open('libpolaris.so');
+            } catch (_) {
+              return DynamicLibrary.open('librustdesk.so');
+            }
+          }()
         : isLinux
             ? _openLinuxCoreLib()
             : isWindows
-                ? DynamicLibrary.open('librustdesk.dll')
+                ? () {
+                    try {
+                      return DynamicLibrary.open('libpolaris.dll');
+                    } catch (_) {
+                      return DynamicLibrary.open('librustdesk.dll');
+                    }
+                  }()
                 :
                 // Use executable itself as the dynamic library for MacOS.
                 // Multiple dylib instances will cause some global instances to be invalid.
                 // eg. `lazy_static` objects in rust side, will be created more than once, which is not expected.
                 //
-                // isMacOS? DynamicLibrary.open("liblibrustdesk.dylib") :
+                // isMacOS? DynamicLibrary.open("libpolaris.dylib") :
                 DynamicLibrary.process();
     debugPrint('initializing FFI $_appType');
     try {

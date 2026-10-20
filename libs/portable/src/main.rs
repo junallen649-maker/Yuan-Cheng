@@ -18,8 +18,8 @@ const APP_METADATA: &[u8] = &[];
 const APP_METADATA_CONFIG: &str = "meta.toml";
 const META_LINE_PREFIX_TIMESTAMP: &str = "timestamp = ";
 const META_LINE_PREFIX_FILE: &str = "file = ";
-const APP_PREFIX: &str = "rustdesk";
-const APPNAME_RUNTIME_ENV_KEY: &str = "RUSTDESK_APPNAME";
+const APP_PREFIX: &str = "polaris";
+const APPNAME_RUNTIME_ENV_KEY: &str = "POLARIS_APPNAME";
 #[cfg(windows)]
 const SET_FOREGROUND_WINDOW_ENV_KEY: &str = "SET_FOREGROUND_WINDOW";
 
@@ -245,6 +245,7 @@ fn execute(path: PathBuf, args: Vec<String>, _ui: bool) {
     }
 
     cmd.env(APPNAME_RUNTIME_ENV_KEY, exe_name);
+    cmd.env("RUSTDESK_APPNAME", exe_name);
     if use_null_stdio() {
         cmd.stdin(Stdio::null())
             .stdout(Stdio::null())

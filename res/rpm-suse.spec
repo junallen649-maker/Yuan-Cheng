@@ -9,7 +9,7 @@ Recommends: libayatana-appindicator3-1 xdotool
 # https://docs.fedoraproject.org/en-US/packaging-guidelines/Scriptlets/
 
 %description
-The best open-source remote desktop client software, written in Rust.
+Polaris Remote Desktop software.
 
 %prep
 # we have no source, so nothing here

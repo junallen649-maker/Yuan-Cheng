@@ -60,6 +60,7 @@ fn prepare_install_commands(commands: &str) -> ResultType<String> {
          {}\r\n\
          if exist \"%~f0.dir\" exit /b {BATCH_OUTPUT_DIRECTORY_EXISTS_EXIT_CODE}\r\n\
          md \"%~f0.dir\" || exit /b {BATCH_OUTPUT_DIRECTORY_CREATE_FAILURE_EXIT_CODE}\r\n\
+         set \"POLARIS_OUTPUT_DIR=%~f0.dir\"\r\n\
          set \"RUSTDESK_OUTPUT_DIR=%~f0.dir\"\r\n{commands}\r\nexit /b 0\r\n",
         trusted_install_environment()?
     ))
@@ -71,7 +72,7 @@ fn write_install_script(cmds: String) -> ResultType<InstallCommandScript> {
     let commands = prepare_install_commands(&cmds)?;
     let expected_hash = Sha256::digest(commands.as_bytes()).into();
     let path = directory.join(format!(
-        "rustdesk_install_{}.bat",
+        "polaris_install_{}.bat",
         uuid::Uuid::new_v4().simple()
     ));
     let mut file = fs::OpenOptions::new()

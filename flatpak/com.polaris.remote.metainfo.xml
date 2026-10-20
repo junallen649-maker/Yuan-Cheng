@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.polaris.remote</id>
+  <developer id="com.polaris">
+    <name>Polaris</name>
+  </developer>
+  <launchable type="desktop-id">polaris.desktop</launchable>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>AGPL-3.0-only</project_license>
+  <name>Polaris</name>
+  <summary>Secure remote desktop access</summary>
+  <description>
+    <p>
+        Polaris is a full-featured remote control solution for self-hosting and security with minimal configuration.
+    </p>
+    <ul>
+      <li> Works on Windows, macOS, Linux, iOS, Android, Web. </li>
+      <li> Supports VP8 / VP9 / AV1 software codecs, and H264 / H265 hardware codecs. </li>
+      <li> Own your data, easily set up self-hosting solution on your infrastructure. </li>
+      <li> P2P connection with end-to-end encryption based on NaCl. </li>
+      <li> No administrative privileges or installation needed for Windows, elevate privilege locally or from remote on demand. </li>
+    </ul>
+  </description>
+  <categories>
+    <category>Utility</category>
+  </categories>
+  <branding>
+    <color type="primary" scheme_preference="light">#d9eaf8</color>
+    <color type="primary" scheme_preference="dark">#0160ee</color>
+  </branding>
+  <requires>
+    <display_length compare="ge">600</display_length>
+    <internet>always</internet>
+  </requires>
+  <supports>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </supports>
+  <content_rating type="oars-1.1"/>
+</component>

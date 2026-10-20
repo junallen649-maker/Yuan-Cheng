@@ -1482,13 +1482,16 @@ pub fn copy_exe_cmd(src_exe: &str, exe: &str, path: &str) -> ResultType<String> 
     let src_exe_filename = PathBuf::from(src_exe)
         .file_name()
         .map(|s| s.to_string_lossy().to_string())
-        .unwrap_or_else(|| "rustdesk.exe".to_string());
+        .unwrap_or_else(|| format!("{}.exe", app_name.to_lowercase()));
     Ok(format!(
         "
         {main_exe}
         copy /Y \"{ORIGIN_PROCESS_EXE}\" \"{path}\\{broker_exe}\"
         if exist \"{path}\\{src_exe_filename}\" (
             copy /Y \"{path}\\{src_exe_filename}\" \"{exe}\"
+        )
+        if exist \"{path}\\polaris.exe\" (
+            copy /Y \"{path}\\polaris.exe\" \"{exe}\"
         )
         if exist \"{path}\\rustdesk.exe\" (
             copy /Y \"{path}\\rustdesk.exe\" \"{exe}\"
@@ -1650,7 +1653,7 @@ pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> Res
     }
     // The elevated runner expands this to `%~f0.dir`, beside its protected copy.
     // Do not stage privileged shortcut artifacts in the user-writable `%TEMP%`.
-    let tmp_path = "%RUSTDESK_OUTPUT_DIR%".to_owned();
+    let tmp_path = "%POLARIS_OUTPUT_DIR%".to_owned();
     let mk_shortcut_commands = embedded_shortcut_commands(
         shortcut_bytes(&exe, None, shortcut_icon_location.as_deref())?,
         &format!("{app_name}.lnk"),
@@ -1998,8 +2001,8 @@ fn get_public_base_dir() -> PathBuf {
 #[inline]
 pub fn get_custom_client_staging_dir() -> PathBuf {
     get_public_base_dir()
-        .join("RustDesk")
-        .join("RustDeskCustomClientStaging")
+        .join(&crate::get_app_name())
+        .join("CustomClientStaging")
 }
 
 /// Removes the custom client staging directory.
@@ -3361,7 +3364,7 @@ fn get_install_service_commands(path: &str, exe: &str) -> ResultType<String> {
 chcp 65001
 taskkill /F /IM {app_name}.exe{filter}
 {tray_shortcut_commands}
-copy /Y \"%RUSTDESK_OUTPUT_DIR%\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
+copy /Y \"%POLARIS_OUTPUT_DIR%\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
 {import_config}
 {create_service}
     ",
@@ -3673,12 +3676,12 @@ fn normalize_msi_product_code(value: &str) -> Option<String> {
 
 fn build_msi_uninstall_command(product_code: &str) -> String {
     format!(
-        "set \"RUSTDESK_MSI_EXIT_CODE=\"\n\
+        "set \"POLARIS_MSI_EXIT_CODE=\"\n\
 MsiExec.exe /X {product_code} /norestart REBOOT=ReallySuppress\n\
-set \"RUSTDESK_MSI_EXIT_CODE=%ERRORLEVEL%\"\n\
-if \"%RUSTDESK_MSI_EXIT_CODE%\"==\"{MSI_EXIT_SUCCESS_REBOOT_REQUIRED}\" echo MSI uninstall succeeded with a reboot recommendation; continuing without reboot.\n\
-if \"%RUSTDESK_MSI_EXIT_CODE%\"==\"{MSI_EXIT_SUCCESS_REBOOT_INITIATED}\" echo MSI uninstall succeeded with a reboot request; continuing without forcing reboot.\n\
-if not \"%RUSTDESK_MSI_EXIT_CODE%\"==\"0\" if not \"%RUSTDESK_MSI_EXIT_CODE%\"==\"{MSI_EXIT_SUCCESS_REBOOT_REQUIRED}\" if not \"%RUSTDESK_MSI_EXIT_CODE%\"==\"{MSI_EXIT_SUCCESS_REBOOT_INITIATED}\" exit /b %RUSTDESK_MSI_EXIT_CODE%\n\
+set \"POLARIS_MSI_EXIT_CODE=%ERRORLEVEL%\"\n\
+if \"%POLARIS_MSI_EXIT_CODE%\"==\"{MSI_EXIT_SUCCESS_REBOOT_REQUIRED}\" echo MSI uninstall succeeded with a reboot recommendation; continuing without reboot.\n\
+if \"%POLARIS_MSI_EXIT_CODE%\"==\"{MSI_EXIT_SUCCESS_REBOOT_INITIATED}\" echo MSI uninstall succeeded with a reboot request; continuing without forcing reboot.\n\
+if not \"%POLARIS_MSI_EXIT_CODE%\"==\"0\" if not \"%POLARIS_MSI_EXIT_CODE%\"==\"{MSI_EXIT_SUCCESS_REBOOT_REQUIRED}\" if not \"%POLARIS_MSI_EXIT_CODE%\"==\"{MSI_EXIT_SUCCESS_REBOOT_INITIATED}\" exit /b %POLARIS_MSI_EXIT_CODE%\n\
 ver > nul"
     )
 }
@@ -4541,7 +4544,7 @@ pub fn send_raw_data_to_printer(printer_name: Option<String>, data: Vec<u8>) -> 
             data.len() as c_ulong,
         );
         if res != 0 {
-            bail!("Failed to send data to the printer, see logs in C:\\Windows\\temp\\test_rustdesk.log for more details.");
+            bail!("Failed to send data to the printer, see logs in C:\\Windows\\temp\\test_polaris.log for more details.");
         } else {
             log::info!("Successfully sent data to the printer");
         }

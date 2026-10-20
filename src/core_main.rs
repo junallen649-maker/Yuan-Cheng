@@ -81,7 +81,10 @@ pub fn core_main() -> Option<Vec<String>> {
         i += 1;
     }
     let lower_exe = arg_exe.to_lowercase();
-    let env_appname = std::env::var("RUSTDESK_APPNAME").unwrap_or_default().to_lowercase();
+    let env_appname = std::env::var("POLARIS_APPNAME")
+        .or_else(|_| std::env::var("RUSTDESK_APPNAME"))
+        .unwrap_or_default()
+        .to_lowercase();
     #[cfg(windows)]
     let is_agent_reg = crate::platform::get_reg("ClientRole") == "agent";
     #[cfg(not(windows))]
