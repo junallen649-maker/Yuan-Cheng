@@ -13,6 +13,7 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter_hbb/models/peer_model.dart';
+import 'package:flutter_hbb/utils/multi_window_manager.dart';
 
 import '../../common.dart';
 import '../../common/formatter/id_formatter.dart';
