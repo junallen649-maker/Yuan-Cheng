@@ -90,12 +90,15 @@ pub fn core_main() -> Option<Vec<String>> {
     #[cfg(not(windows))]
     let is_agent_reg = false;
 
-    let is_agent = args.iter().any(|a| a == "--agent" || a == "--incoming" || a == "--service" || a == "--server" || a == "--install-agent")
+    let is_console = args.iter().any(|a| a == "--console" || a == "--outgoing")
+        || lower_exe.contains("console");
+
+    let is_agent = !is_console && (args.iter().any(|a| a == "--agent" || a == "--incoming" || a == "--service" || a == "--server" || a == "--install-agent")
         || lower_exe.contains("agent")
         || env_appname.contains("agent")
         || is_agent_reg
         || config::Config::get_option("client-role") == "agent"
-        || config::LocalConfig::get_option("client-role") == "agent";
+        || config::LocalConfig::get_option("client-role") == "agent");
 
     let role = if is_agent { "incoming" } else { "outgoing" };
     config::HARD_SETTINGS.write().unwrap().insert("conn-type".to_string(), role.to_string());
@@ -104,6 +107,11 @@ pub fn core_main() -> Option<Vec<String>> {
         config::Config::set_option("conn-type".to_string(), "incoming".to_string());
         config::LocalConfig::set_option("client-role".to_string(), "agent".to_string());
         config::LocalConfig::set_option("conn-type".to_string(), "incoming".to_string());
+    } else if is_console {
+        config::Config::set_option("client-role".to_string(), "console".to_string());
+        config::Config::set_option("conn-type".to_string(), "outgoing".to_string());
+        config::LocalConfig::set_option("client-role".to_string(), "console".to_string());
+        config::LocalConfig::set_option("conn-type".to_string(), "outgoing".to_string());
     }
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     if args.is_empty() {
