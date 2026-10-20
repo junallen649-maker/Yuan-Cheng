@@ -93,7 +93,7 @@ def make_parser():
         "-m",
         "--manufacturer",
         type=str,
-        default="Purslane Tech Pte. Ltd.",
+        default="Polaris",
         help="The app manufacturer.",
     )
     return parser
@@ -346,7 +346,7 @@ def gen_native_arp_properties():
             f"{indent}<!--https://learn.microsoft.com/en-us/windows/win32/msi/property-reference-->\n"
         )
         for _, v in g_arpsystemcomponent.items():
-            if "msi" in v and "v" in v:
+            if "msi" in v and v.get("v"):
                 lines_new.append(
                     f'{indent}<Property Id={quoteattr(str(v["msi"]))} '
                     f'Value={quoteattr(str(v["v"]))} />\n'
