@@ -35,6 +35,9 @@ class RelativeMouseState {
     private init() {}
 }
 
+@_silgen_name("polaris_core_main")
+func polaris_core_main() -> Bool
+
 class MainFlutterWindow: NSWindow {
     private static let fullscreenWorkAreaSizes = NSMapTable<NSWindow, NSValue>(
         keyOptions: [.weakMemory, .objectPointerPersonality],
@@ -55,10 +58,6 @@ class MainFlutterWindow: NSWindow {
         )
     }
 
-@_silgen_name("polaris_core_main")
-func polaris_core_main() -> Bool
-
-class MainFlutterWindow: NSWindow {
     override func awakeFromNib() {
         _ = polaris_core_main();
         _ = MainFlutterWindow.fullscreenObserver
