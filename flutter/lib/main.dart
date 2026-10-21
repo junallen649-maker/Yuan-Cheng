@@ -155,6 +155,7 @@ void runMainApp(bool startService) async {
   windowManager.waitUntilReadyToShow(windowOptions, () async {
     // Restore the location of the main window before window hide or show.
     await restoreWindowPosition(WindowType.Main);
+    final handledByUniLinks = await initUniLinks();
     final isIncomingOnly = bind.isIncomingOnly();
     final bool shouldStartHidden = isIncomingOnly && !kBootArgs.contains('--show');
     if (handledByUniLinks || handleUriLink(cmdArgs: kBootArgs) || shouldStartHidden) {
