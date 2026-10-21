@@ -981,20 +981,24 @@ def build_flutter_windows(version, features, skip_portable_pack):
         return
     os.chdir('libs/portable')
     system2('pip3 install -r requirements.txt')
+    exe_name = 'polaris.exe' if os.path.exists(f'../../{flutter_build_dir_2}/polaris.exe') else 'rustdesk.exe'
     system2(
-        f'python3 ./generate.py -f ../../{flutter_build_dir_2} -o . -e ../../{flutter_build_dir_2}/rustdesk.exe')
+        f'python3 ./generate.py -f ../../{flutter_build_dir_2} -o . -e ../../{flutter_build_dir_2}/{exe_name}')
     os.chdir('../..')
-    if os.path.exists('./rustdesk_portable.exe'):
+    app_target_name = 'polaris' if os.path.exists(f'{flutter_build_dir_2}/polaris.exe') else 'rustdesk'
+    portable_name = f'./{app_target_name}_portable.exe'
+    if os.path.exists(portable_name):
         os.replace('./target/release/rustdesk-portable-packer.exe',
-                   './rustdesk_portable.exe')
+                   portable_name)
     else:
         os.rename('./target/release/rustdesk-portable-packer.exe',
-                  './rustdesk_portable.exe')
+                  portable_name)
     print(
-        f'output location: {os.path.abspath(os.curdir)}/rustdesk_portable.exe')
-    os.rename('./rustdesk_portable.exe', f'./rustdesk-{version}-install.exe')
+        f'output location: {os.path.abspath(os.curdir)}/{portable_name}')
+    install_name = f'./{app_target_name}-{version}-install.exe'
+    os.rename(portable_name, install_name)
     print(
-        f'output location: {os.path.abspath(os.curdir)}/rustdesk-{version}-install.exe')
+        f'output location: {os.path.abspath(os.curdir)}/{install_name}')
 
 
 def main():

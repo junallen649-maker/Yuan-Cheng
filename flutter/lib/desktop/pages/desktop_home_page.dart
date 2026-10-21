@@ -85,11 +85,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildLeftPane(BuildContext context) {
-    final isIncomingOnly = bind.isIncomingOnly();
-    if (isIncomingOnly) {
-      return _buildIncomingLeftPane(context);
-    }
-    return _buildDeskNavSidebar(context);
+    return _buildIncomingLeftPane(context);
   }
 
   Widget _buildDeskNavSidebar(BuildContext context) {
@@ -534,68 +530,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildRightPane(BuildContext context) {
-    Widget content;
-    if (_selectedNav == 'remote_assist') {
-      content = const DeskRemoteAssistView(key: ValueKey('remote_assist'));
-    } else if (_selectedNav.startsWith('device_')) {
-      if (_selectedPeer != null) {
-        content = DeskDeviceDetailView(
-          key: ValueKey('device_${_selectedPeer!.id}'),
-          peer: _selectedPeer!,
-          onPeerUpdated: () => setState(() {}),
-        );
-      } else {
-        content = const DeskRemoteAssistView(key: ValueKey('remote_assist_fallback'));
-      }
-    } else if (_selectedNav == 'all_devices' || _selectedNav == 'favorite_devices') {
-      content = Container(
-        key: ValueKey(_selectedNav),
-        color: Theme.of(context).scaffoldBackgroundColor,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Row(
-                children: [
-                  Icon(
-                    _selectedNav == 'all_devices' ? Icons.grid_view_rounded : Icons.star_rounded,
-                    color: const Color(0xFF1E6FFF),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _selectedNav == 'all_devices' ? '全部设备' : '收藏设备',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            const Expanded(child: PeerTabPage()),
-          ],
-        ),
-      );
-    } else {
-      content = const DeskRemoteAssistView(key: ValueKey('default_assist'));
-    }
-
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 220),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
-      transitionBuilder: (child, animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0.015, 0),
-              end: Offset.zero,
-            ).animate(animation),
-            child: child,
-          ),
-        );
-      },
-      child: content,
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: const ConnectionPage(),
     );
   }
 
@@ -668,6 +605,26 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   Widget buildPopupMenu(BuildContext context) {
+    if (bind.isIncomingOnly()) {
+      return Tooltip(
+        message: translate('Copy'),
+        child: InkWell(
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: gFFI.serverModel.serverId.text));
+            showToast(translate("Copied"));
+          },
+          child: CircleAvatar(
+            radius: 15,
+            backgroundColor: Colors.transparent,
+            child: Icon(
+              Icons.more_vert_outlined,
+              size: 20,
+              color: Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.5),
+            ),
+          ),
+        ),
+      );
+    }
     final textColor = Theme.of(context).textTheme.titleLarge?.color;
     RxBool hover = false.obs;
     return InkWell(
@@ -785,8 +742,13 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                               ).marginOnly(right: 8, top: 4),
                             ),
                           ),
-                          onTap: () => DesktopSettingPage.switch2page(
-                              SettingsTabKey.safety),
+                          onTap: () {
+                            if (bind.isIncomingOnly()) {
+                              showToast(translate("受控模式已锁定"));
+                              return;
+                            }
+                            DesktopSettingPage.switch2page(SettingsTabKey.safety);
+                          },
                           onHover: (value) => editHover.value = value,
                         ),
                     ],
@@ -867,9 +829,26 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       return buildInstallCard("", systemError, "", () {});
     }
 
+    if (bind.isIncomingOnly()) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: OutlinedButton(
+          onPressed: () {
+            SystemNavigator.pop();
+            if (isWindows) {
+              exit(0);
+            }
+          },
+          child: Text(translate('Quit')),
+        ),
+      ).marginAll(14);
+    }
     if (isWindows && !bind.isDisableInstallation()) {
       if (!bind.mainIsInstalled()) {
-        return const SizedBox();
+        return buildInstallCard("", "install_tip", "Install", () async {
+          await rustDeskWinManager.closeAllSubWindows();
+          bind.mainGotoInstall();
+        });
       } else if (bind.mainIsInstalledLowerVersion()) {
         return buildInstallCard(
             "Status", "Your installation is lower version.", "Click to upgrade",
@@ -956,21 +935,6 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         );
       }
     }
-    if (bind.isIncomingOnly()) {
-      return Align(
-        alignment: Alignment.centerRight,
-        child: OutlinedButton(
-          onPressed: () {
-            SystemNavigator.pop(); // Close the application
-            // https://github.com/flutter/flutter/issues/66631
-            if (isWindows) {
-              exit(0);
-            }
-          },
-          child: Text(translate('Quit')),
-        ),
-      ).marginAll(14);
-    }
     return Container();
   }
 
@@ -1011,8 +975,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 colors: [
-                  const Color(0xFF1E6FFF),
-                  const Color(0xFF0D51D8),
+                  const Color.fromARGB(255, 239, 83, 107),
+                  const Color.fromARGB(255, 224, 79, 95),
                 ],
               )),
               padding: EdgeInsets.all(20),

@@ -91,11 +91,14 @@ pub fn core_main() -> Option<Vec<String>> {
     let is_agent_reg = false;
 
     let is_console = args.iter().any(|a| a == "--console" || a == "--outgoing")
-        || lower_exe.contains("console");
+        || lower_exe.contains("console")
+        || lower_exe.contains("控制");
 
     let is_agent = !is_console && (args.iter().any(|a| a == "--agent" || a == "--incoming" || a == "--service" || a == "--server" || a == "--install-agent")
         || lower_exe.contains("agent")
+        || lower_exe.contains("受控")
         || env_appname.contains("agent")
+        || env_appname.contains("受控")
         || is_agent_reg
         || config::Config::get_option("client-role") == "agent"
         || config::LocalConfig::get_option("client-role") == "agent");
@@ -121,8 +124,9 @@ pub fn core_main() -> Option<Vec<String>> {
         // Because `--server` process is the System user's process. We can't get the arguments in `check_process()`.
         // We can assume that self service running means the server is also running on Windows.
         #[cfg(target_os = "windows")]
-        let should_check_start_tray = crate::platform::is_self_service_running()
-            && crate::platform::is_cur_exe_the_installed();
+        let should_check_start_tray = (crate::platform::is_self_service_running()
+            && crate::platform::is_cur_exe_the_installed())
+            || is_agent;
         if should_check_start_tray && !crate::check_process("--tray", true) {
             #[cfg(target_os = "linux")]
             hbb_common::allow_err!(crate::platform::check_autostart_config());

@@ -313,9 +313,13 @@ fn main() -> Result<(), String> {
             args = vec!["--install".to_owned()];
         } else if quick_support {
             args = vec!["--quick_support".to_owned()];
-        } else if lower_arg_exe.contains("agent") {
+        } else if lower_arg_exe.contains("agent") || lower_arg_exe.contains("受控") {
             if !args.iter().any(|a| a == "--agent" || a == "--incoming") {
                 args.push("--agent".to_owned());
+            }
+        } else if lower_arg_exe.contains("console") || lower_arg_exe.contains("控制") {
+            if !args.iter().any(|a| a == "--console" || a == "--outgoing") {
+                args.push("--console".to_owned());
             }
         }
         execute(exe, args, ui);
