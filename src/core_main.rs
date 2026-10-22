@@ -99,22 +99,20 @@ pub fn core_main() -> Option<Vec<String>> {
         || lower_exe.contains("受控")
         || env_appname.contains("agent")
         || env_appname.contains("受控")
-        || is_agent_reg
-        || config::Config::get_option("client-role") == "agent"
-        || config::LocalConfig::get_option("client-role") == "agent");
+        || is_agent_reg);
 
-    let role = if is_agent { "incoming" } else { "outgoing" };
-    config::HARD_SETTINGS.write().unwrap().insert("conn-type".to_string(), role.to_string());
     if is_agent {
+        config::HARD_SETTINGS.write().unwrap().insert("conn-type".to_string(), "incoming".to_string());
         config::Config::set_option("client-role".to_string(), "agent".to_string());
         config::Config::set_option("conn-type".to_string(), "incoming".to_string());
         config::LocalConfig::set_option("client-role".to_string(), "agent".to_string());
         config::LocalConfig::set_option("conn-type".to_string(), "incoming".to_string());
-    } else if is_console {
+    } else {
+        config::HARD_SETTINGS.write().unwrap().remove("conn-type");
         config::Config::set_option("client-role".to_string(), "console".to_string());
-        config::Config::set_option("conn-type".to_string(), "outgoing".to_string());
+        config::Config::set_option("conn-type".to_string(), "".to_string());
         config::LocalConfig::set_option("client-role".to_string(), "console".to_string());
-        config::LocalConfig::set_option("conn-type".to_string(), "outgoing".to_string());
+        config::LocalConfig::set_option("conn-type".to_string(), "".to_string());
     }
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     if args.is_empty() {
@@ -210,11 +208,7 @@ pub fn core_main() -> Option<Vec<String>> {
 
     #[cfg(windows)]
     let is_agent_setup = is_agent && (
-        lower_exe.contains("agent-setup")
-        || lower_exe.contains("setup-agent")
-        || env_appname.contains("agent-setup")
-        || env_appname.contains("setup-agent")
-        || args.iter().any(|a| a == "--install-agent" || (a == "--silent-install" && args.iter().any(|x| x == "--agent")))
+        args.iter().any(|a| a == "--install-agent" || (a == "--silent-install" && args.iter().any(|x| x == "--agent")))
     );
 
     #[cfg(windows)]
@@ -838,9 +832,13 @@ fn import_config(path: &str) {
         }
     }
     let mut config2: Config2 = load_path(path2.into());
-    if is_incoming_only() || config2.options.get("client-role").map(|s| s.as_str()) == Some("agent") {
+    if is_incoming_only() {
         config2.options.insert("client-role".to_string(), "agent".to_string());
         config2.options.insert("conn-type".to_string(), "incoming".to_string());
+    } else {
+        if config2.options.get("conn-type").map(|s| s.as_str()) == Some("outgoing") {
+            config2.options.remove("conn-type");
+        }
     }
     if get_modified_time(&path2) > get_modified_time(&Config2::file()) {
         if store_path(Config2::file(), config2).is_err() {

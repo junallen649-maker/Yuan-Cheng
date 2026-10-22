@@ -562,7 +562,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Multiple Windows sessions found", "發現多個 Windows 工作階段"),
         ("Please select the session you want to connect to", "請選擇您想要連結的工作階段"),
         ("powered_by_me", "由 Polaris 提供支援"),
-        ("outgoing_only_desk_tip", "目前版本的軟體是自訂版本。\n您可以連線至其他裝置，但是其他裝置無法連線至您的裝置。"),
+        ("outgoing_only_desk_tip", ""),
         ("preset_password_warning", "此客製化版本附有預設密碼。任何知曉此密碼的人都能完全控制您的裝置。如果這不是您所預期的，請立即移除此軟體。"),
         ("Security Alert", "安全警告"),
         ("My address book", "我的通訊錄"),

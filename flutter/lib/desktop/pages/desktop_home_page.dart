@@ -456,9 +456,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 
   Widget _buildIncomingLeftPane(BuildContext context) {
     final isIncomingOnly = bind.isIncomingOnly();
-    final isOutgoingOnly = bind.isOutgoingOnly();
     final children = <Widget>[
-      if (!isOutgoingOnly) buildPresetPasswordWarning(),
+      buildPresetPasswordWarning(),
       if (bind.isCustomClient())
         Align(
           alignment: Alignment.center,
@@ -469,8 +468,8 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         child: loadLogo(),
       ),
       buildTip(context),
-      if (!isOutgoingOnly) buildIDBoard(context),
-      if (!isOutgoingOnly) buildPasswordBoard(context),
+      buildIDBoard(context),
+      buildPasswordBoard(context),
       FutureBuilder<Widget>(
         future: Future.value(
             Obx(() => buildHelpCards(stateGlobal.updateUrl.value))),
@@ -763,7 +762,6 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   }
 
   buildTip(BuildContext context) {
-    final isOutgoingOnly = bind.isOutgoingOnly();
     return Padding(
       padding:
           const EdgeInsets.only(left: 20.0, right: 16, top: 16.0, bottom: 5),
@@ -771,33 +769,21 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            children: [
-              if (!isOutgoingOnly)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    translate("Your Desktop"),
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                ),
-            ],
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              translate("Your Desktop"),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
           ),
-          SizedBox(
+          const SizedBox(
             height: 10.0,
           ),
-          if (!isOutgoingOnly)
-            Text(
-              translate("desk_tip"),
-              overflow: TextOverflow.clip,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          if (isOutgoingOnly)
-            Text(
-              translate("outgoing_only_desk_tip"),
-              overflow: TextOverflow.clip,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+          Text(
+            translate("desk_tip"),
+            overflow: TextOverflow.clip,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
     );

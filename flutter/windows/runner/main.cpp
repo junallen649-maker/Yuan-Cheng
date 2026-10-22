@@ -108,6 +108,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   // Uri links dispatch
   HWND hwnd = ::FindWindowW(getWindowClassName(), app_name.c_str());
+  if (hwnd == NULL) {
+    hwnd = ::FindWindowW(getWindowClassName(), nullptr);
+  }
   if (hwnd != NULL) {
     // Allow multiple flutter instances when being executed by parameters
     // contained in whitelists.
@@ -120,21 +123,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                     whitelist_param) != command_line_arguments.end();
     }
     if (!allow_multiple_instances) {
+      DWORD pid = 0;
+      ::GetWindowThreadProcessId(hwnd, &pid);
+      if (pid != 0) {
+        ::AllowSetForegroundWindow(pid);
+      }
       if (!command_line_arguments.empty()) {
-        // The process launched by the browser owns the foreground permission.
-        // Transfer it to the existing Polaris process before dispatching the
-        // URI so that it can bring an existing session to the foreground.
-        DWORD pid = 0;
-        ::GetWindowThreadProcessId(hwnd, &pid);
-        if (pid != 0) {
-          ::AllowSetForegroundWindow(pid);
-        }
         // Dispatch command line arguments
         DispatchToUniLinksDesktop(hwnd);
       } else {
         // Not called with arguments, or just open the app shortcut on desktop.
         // So we just show the main window instead.
-        ::ShowWindow(hwnd, SW_NORMAL);
+        ::ShowWindow(hwnd, SW_RESTORE);
+        ::ShowWindow(hwnd, SW_SHOW);
         ::SetForegroundWindow(hwnd);
       }
       return EXIT_FAILURE;
