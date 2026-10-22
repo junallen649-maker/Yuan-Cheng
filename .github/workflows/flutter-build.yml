@@ -358,10 +358,8 @@ jobs:
           cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/Polaris-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
           cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/Polaris-Console-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
           cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/Polaris-Agent-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
-          cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/Polaris-控制端-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
-          cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/Polaris-受控端-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
-          cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/Polaris-控制端.exe
-          cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/Polaris-受控端.exe
+          cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/Polaris-Console.exe
+          cp ./target/release/rustdesk-portable-packer.exe ./SignOutput/Polaris-Agent.exe
           mv ./target/release/rustdesk-portable-packer.exe ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
 
       - name: Add MSBuild to PATH
