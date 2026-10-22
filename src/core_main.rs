@@ -97,8 +97,10 @@ pub fn core_main() -> Option<Vec<String>> {
     let is_agent = !is_console && (args.iter().any(|a| a == "--agent" || a == "--incoming" || a == "--service" || a == "--server" || a == "--install-agent")
         || lower_exe.contains("agent")
         || lower_exe.contains("受控")
+        || lower_exe.contains("被控")
         || env_appname.contains("agent")
         || env_appname.contains("受控")
+        || env_appname.contains("被控")
         || is_agent_reg);
 
     if is_agent {
