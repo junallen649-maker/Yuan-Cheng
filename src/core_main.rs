@@ -48,6 +48,8 @@ pub fn core_main() -> Option<Vec<String>> {
     let mut _is_flutter_invoke_new_connection = false;
     let mut no_server = false;
     let mut arg_exe = Default::default();
+    let mut has_console_flag = false;
+    let mut has_agent_flag = false;
     for arg in std::env::args() {
         if i == 0 {
             arg_exe = arg;
@@ -74,8 +76,10 @@ pub fn core_main() -> Option<Vec<String>> {
                 _is_quick_support = true;
             } else if arg == "--no-server" {
                 no_server = true;
-            } else if arg == "--console" || arg == "--agent" || arg == "--incoming" || arg == "--outgoing" {
-                // Role flags handled above, do not treat as CLI commands
+            } else if arg == "--console" || arg == "--outgoing" {
+                has_console_flag = true;
+            } else if arg == "--agent" || arg == "--incoming" {
+                has_agent_flag = true;
             } else {
                 args.push(arg);
             }
@@ -92,11 +96,13 @@ pub fn core_main() -> Option<Vec<String>> {
     #[cfg(not(windows))]
     let is_agent_reg = false;
 
-    let is_console = args.iter().any(|a| a == "--console" || a == "--outgoing")
+    let is_console = has_console_flag
+        || args.iter().any(|a| a == "--console" || a == "--outgoing")
         || lower_exe.contains("console")
         || lower_exe.contains("控制");
 
-    let is_agent = !is_console && (args.iter().any(|a| a == "--agent" || a == "--incoming" || a == "--service" || a == "--server" || a == "--install-agent")
+    let is_agent = !is_console && (has_agent_flag
+        || args.iter().any(|a| a == "--agent" || a == "--incoming" || a == "--service" || a == "--server" || a == "--install-agent")
         || lower_exe.contains("agent")
         || lower_exe.contains("受控")
         || lower_exe.contains("被控")

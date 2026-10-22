@@ -153,10 +153,17 @@ void runMainApp(bool startService) async {
   WindowOptions windowOptions = getHiddenTitleBarWindowOptions(
       isMainWindow: true, alwaysOnTop: alwaysOnTop);
   windowManager.waitUntilReadyToShow(windowOptions, () async {
-    // Restore the location of the main window before window hide or show.
-    await restoreWindowPosition(WindowType.Main);
-    await initUniLinks();
-    handleUriLink(cmdArgs: kBootArgs);
+    try {
+      await restoreWindowPosition(WindowType.Main);
+    } catch (e) {
+      debugPrint('restoreWindowPosition error: $e');
+    }
+    try {
+      await initUniLinks();
+      handleUriLink(cmdArgs: kBootArgs);
+    } catch (e) {
+      debugPrint('handleUriLink error: $e');
+    }
     final bool hasRemoteSessionArg = kBootArgs.any((arg) => const [
           '--connect',
           '--play',
@@ -171,15 +178,18 @@ void runMainApp(bool startService) async {
         kBootArgs.contains('--server') ||
         kBootArgs.contains('--service');
     if (hasRemoteSessionArg || isSilentBgLaunch) {
-      windowManager.hide();
+      await windowManager.hide();
     } else {
-      windowManager.show();
-      windowManager.focus();
+      if (bind.isIncomingOnly()) {
+        await windowManager.setSize(getIncomingOnlyHomeSize());
+      }
+      await windowManager.setOpacity(1.0);
+      await windowManager.show();
+      await windowManager.focus();
       // Move registration of active main window here to prevent from async visible check.
       rustDeskWinManager.registerActiveWindow(kWindowMainId);
     }
-    windowManager.setOpacity(1);
-    windowManager.setTitle(getWindowName());
+    await windowManager.setTitle(getWindowName());
     // Do not use `windowManager.setResizable()` here.
     setResizable(!bind.isIncomingOnly());
   });

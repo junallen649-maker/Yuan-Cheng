@@ -128,15 +128,21 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
       if (pid != 0) {
         ::AllowSetForegroundWindow(pid);
       }
-      if (!command_line_arguments.empty()) {
-        // Dispatch command line arguments
+      ::ShowWindow(hwnd, SW_RESTORE);
+      ::ShowWindow(hwnd, SW_SHOW);
+      ::SetForegroundWindow(hwnd);
+
+      bool has_url_or_connect = false;
+      for (const auto& arg : command_line_arguments) {
+        if (arg.find("://") != std::string::npos ||
+            arg == "--connect" || arg == "--play" || arg == "--file-transfer" ||
+            arg == "--view-camera" || arg == "--port-forward" || arg == "--rdp" || arg == "--terminal") {
+          has_url_or_connect = true;
+          break;
+        }
+      }
+      if (has_url_or_connect) {
         DispatchToUniLinksDesktop(hwnd);
-      } else {
-        // Not called with arguments, or just open the app shortcut on desktop.
-        // So we just show the main window instead.
-        ::ShowWindow(hwnd, SW_RESTORE);
-        ::ShowWindow(hwnd, SW_SHOW);
-        ::SetForegroundWindow(hwnd);
       }
       return EXIT_FAILURE;
     }
@@ -197,6 +203,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
       return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);
+
+  bool is_silent_bg_launch = false;
+  for (const auto& arg : command_line_arguments) {
+    if (arg == "--tray" || arg == "--server" || arg == "--service" || arg == "--hidden") {
+      is_silent_bg_launch = true;
+      break;
+    }
+  }
+  if (!is_silent_bg_launch && !is_cm_page) {
+    ::ShowWindow(window.GetHandle(), SW_SHOWNORMAL);
+    ::UpdateWindow(window.GetHandle());
+    ::SetForegroundWindow(window.GetHandle());
+  }
 
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0))

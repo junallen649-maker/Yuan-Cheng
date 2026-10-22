@@ -313,7 +313,7 @@ fn main() -> Result<(), String> {
             args = vec!["--install".to_owned()];
         } else if quick_support {
             args = vec!["--quick_support".to_owned()];
-        } else if lower_arg_exe.contains("agent") || lower_arg_exe.contains("受控") {
+        } else if lower_arg_exe.contains("agent") || lower_arg_exe.contains("受控") || lower_arg_exe.contains("被控") {
             if !args.iter().any(|a| a == "--agent" || a == "--incoming") {
                 args.push("--agent".to_owned());
             }
@@ -321,6 +321,12 @@ fn main() -> Result<(), String> {
             if !args.iter().any(|a| a == "--console" || a == "--outgoing") {
                 args.push("--console".to_owned());
             }
+        }
+        let is_silent = args.iter().any(|a| {
+            a == "--silent-install" || a == "--tray" || a == "--server" || a == "--service" || a == "--hidden"
+        });
+        if !is_silent {
+            ui = true;
         }
         execute(exe, args, ui);
     }
