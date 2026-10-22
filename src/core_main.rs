@@ -74,6 +74,8 @@ pub fn core_main() -> Option<Vec<String>> {
                 _is_quick_support = true;
             } else if arg == "--no-server" {
                 no_server = true;
+            } else if arg == "--console" || arg == "--agent" || arg == "--incoming" || arg == "--outgoing" {
+                // Role flags handled above, do not treat as CLI commands
             } else {
                 args.push(arg);
             }

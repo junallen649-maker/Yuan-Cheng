@@ -155,12 +155,22 @@ void runMainApp(bool startService) async {
   windowManager.waitUntilReadyToShow(windowOptions, () async {
     // Restore the location of the main window before window hide or show.
     await restoreWindowPosition(WindowType.Main);
-    final handledByUniLinks = await initUniLinks();
+    await initUniLinks();
+    handleUriLink(cmdArgs: kBootArgs);
+    final bool hasRemoteSessionArg = kBootArgs.any((arg) => const [
+          '--connect',
+          '--play',
+          '--file-transfer',
+          '--view-camera',
+          '--port-forward',
+          '--rdp',
+          '--terminal',
+        ].contains(arg));
     final bool isSilentBgLaunch = kBootArgs.contains('--hidden') ||
         kBootArgs.contains('--tray') ||
         kBootArgs.contains('--server') ||
         kBootArgs.contains('--service');
-    if (handledByUniLinks || handleUriLink(cmdArgs: kBootArgs) || isSilentBgLaunch) {
+    if (hasRemoteSessionArg || isSilentBgLaunch) {
       windowManager.hide();
     } else {
       windowManager.show();
