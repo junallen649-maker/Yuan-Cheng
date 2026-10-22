@@ -238,9 +238,10 @@ fn execute(path: PathBuf, args: Vec<String>, _ui: bool) {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        cmd.creation_flags(winapi::um::winbase::CREATE_NO_WINDOW);
         if _ui {
             cmd.env(SET_FOREGROUND_WINDOW_ENV_KEY, "1");
+        } else {
+            cmd.creation_flags(winapi::um::winbase::CREATE_NO_WINDOW);
         }
     }
 

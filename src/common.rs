@@ -873,11 +873,11 @@ pub fn run_me<T: AsRef<std::ffi::OsStr>>(args: Vec<T>) -> std::io::Result<std::p
     let mut force_foreground = false;
     #[cfg(windows)]
     {
-        let arg_strs = args
-            .iter()
-            .map(|x| x.as_ref().to_string_lossy())
-            .collect::<Vec<_>>();
-        if arg_strs == vec!["--install"] || arg_strs == &["--noinstall"] {
+        let is_silent = args.iter().any(|x| {
+            let s = x.as_ref().to_string_lossy();
+            s == "--tray" || s == "--server" || s == "--service" || s == "--hidden" || s == "--silent-install"
+        });
+        if !is_silent {
             cmd.env(crate::platform::SET_FOREGROUND_WINDOW, "1");
             force_foreground = true;
         }

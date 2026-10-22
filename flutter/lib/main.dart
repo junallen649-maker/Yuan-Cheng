@@ -152,47 +152,52 @@ void runMainApp(bool startService) async {
   // Set window option.
   WindowOptions windowOptions = getHiddenTitleBarWindowOptions(
       isMainWindow: true, alwaysOnTop: alwaysOnTop);
-  windowManager.waitUntilReadyToShow(windowOptions, () async {
-    try {
-      await restoreWindowPosition(WindowType.Main);
-    } catch (e) {
-      debugPrint('restoreWindowPosition error: $e');
+  try {
+    await windowManager
+        .waitUntilReadyToShow(windowOptions)
+        .timeout(const Duration(milliseconds: 600));
+  } catch (_) {}
+
+  try {
+    await restoreWindowPosition(WindowType.Main);
+  } catch (e) {
+    debugPrint('restoreWindowPosition error: $e');
+  }
+  try {
+    await initUniLinks();
+    handleUriLink(cmdArgs: kBootArgs);
+  } catch (e) {
+    debugPrint('handleUriLink error: $e');
+  }
+  final bool hasRemoteSessionArg = kBootArgs.any((arg) => const [
+        '--connect',
+        '--play',
+        '--file-transfer',
+        '--view-camera',
+        '--port-forward',
+        '--rdp',
+        '--terminal',
+      ].contains(arg));
+  final bool isSilentBgLaunch = kBootArgs.contains('--hidden') ||
+      kBootArgs.contains('--tray') ||
+      kBootArgs.contains('--server') ||
+      kBootArgs.contains('--service');
+  if (hasRemoteSessionArg || isSilentBgLaunch) {
+    await windowManager.hide();
+  } else {
+    if (bind.isIncomingOnly()) {
+      await windowManager.setSize(getIncomingOnlyHomeSize());
+      setResizable(false);
     }
-    try {
-      await initUniLinks();
-      handleUriLink(cmdArgs: kBootArgs);
-    } catch (e) {
-      debugPrint('handleUriLink error: $e');
-    }
-    final bool hasRemoteSessionArg = kBootArgs.any((arg) => const [
-          '--connect',
-          '--play',
-          '--file-transfer',
-          '--view-camera',
-          '--port-forward',
-          '--rdp',
-          '--terminal',
-        ].contains(arg));
-    final bool isSilentBgLaunch = kBootArgs.contains('--hidden') ||
-        kBootArgs.contains('--tray') ||
-        kBootArgs.contains('--server') ||
-        kBootArgs.contains('--service');
-    if (hasRemoteSessionArg || isSilentBgLaunch) {
-      await windowManager.hide();
-    } else {
-      if (bind.isIncomingOnly()) {
-        await windowManager.setSize(getIncomingOnlyHomeSize());
-      }
-      await windowManager.setOpacity(1.0);
-      await windowManager.show();
-      await windowManager.focus();
-      // Move registration of active main window here to prevent from async visible check.
-      rustDeskWinManager.registerActiveWindow(kWindowMainId);
-    }
-    await windowManager.setTitle(getWindowName());
-    // Do not use `windowManager.setResizable()` here.
-    setResizable(!bind.isIncomingOnly());
-  });
+    await windowManager.setOpacity(1.0);
+    await windowManager.show();
+    await windowManager.focus();
+    rustDeskWinManager.registerActiveWindow(kWindowMainId);
+  }
+  await windowManager.setTitle(getWindowName());
+  if (!bind.isIncomingOnly()) {
+    setResizable(true);
+  }
 }
 
 void runMobileApp() async {
