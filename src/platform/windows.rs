@@ -112,7 +112,7 @@ use installer_shell::{
     shortcut_bytes, validate_install_value,
 };
 
-pub const FLUTTER_RUNNER_WIN32_WINDOW_CLASS: &'static str = "FLUTTER_RUNNER_WIN32_WINDOW"; // main window, install window
+pub const FLUTTER_RUNNER_WIN32_WINDOW_CLASS: &'static str = "POLARIS_RUNNER_WIN32_WINDOW"; // main window, install window
 pub const EXPLORER_EXE: &'static str = "explorer.exe";
 pub const SET_FOREGROUND_WINDOW: &'static str = "SET_FOREGROUND_WINDOW";
 

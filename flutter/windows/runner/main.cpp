@@ -106,10 +106,28 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
     }
   }
 
-  // Uri links dispatch
   HWND hwnd = ::FindWindowW(getWindowClassName(), app_name.c_str());
   if (hwnd == NULL) {
-    hwnd = ::FindWindowW(getWindowClassName(), nullptr);
+    HWND found = ::FindWindowW(getWindowClassName(), nullptr);
+    if (found != NULL) {
+      DWORD pid = 0;
+      ::GetWindowThreadProcessId(found, &pid);
+      if (pid != 0) {
+        HANDLE hProcess = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+        if (hProcess) {
+          wchar_t exePath[MAX_PATH] = {0};
+          DWORD size = MAX_PATH;
+          if (::QueryFullProcessImageNameW(hProcess, 0, exePath, &size)) {
+            std::wstring pathStr(exePath);
+            std::transform(pathStr.begin(), pathStr.end(), pathStr.begin(), ::tolower);
+            if (pathStr.find(L"polaris") != std::wstring::npos || pathStr.find(L"rustdesk") != std::wstring::npos) {
+              hwnd = found;
+            }
+          }
+          ::CloseHandle(hProcess);
+        }
+      }
+    }
   }
   if (hwnd != NULL) {
     // Allow multiple flutter instances when being executed by parameters
