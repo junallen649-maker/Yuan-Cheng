@@ -119,7 +119,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
           DWORD size = MAX_PATH;
           if (::QueryFullProcessImageNameW(hProcess, 0, exePath, &size)) {
             std::wstring pathStr(exePath);
-            std::transform(pathStr.begin(), pathStr.end(), pathStr.begin(), ::tolower);
+            for (auto& ch : pathStr) {
+              ch = static_cast<wchar_t>(::towlower(ch));
+            }
             if (pathStr.find(L"polaris") != std::wstring::npos || pathStr.find(L"rustdesk") != std::wstring::npos) {
               hwnd = found;
             }
