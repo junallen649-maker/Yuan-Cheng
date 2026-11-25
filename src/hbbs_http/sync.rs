@@ -1,15 +1,24 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
     time::Duration,
 };
 
 #[cfg(not(any(target_os = "ios")))]
 use crate::{common::API_LOG_INTERVAL, ui_interface::get_builtin_option, Connection};
+#[cfg(not(any(target_os = "ios")))]
+use hbb_common::{
+    bytes::Bytes,
+    config::{self, Config, LocalConfig, CONNECT_TIMEOUT, RENDEZVOUS_PORT},
+    log, password_security,
+    rendezvous_proto::{register_pk_response, rendezvous_message, RegisterPk, RendezvousMessage},
+    socket_client,
+    tokio::{self, sync::broadcast, time::Instant},
+};
+#[cfg(target_os = "ios")]
 use hbb_common::{
     config::{self, Config, LocalConfig},
-    log, password_security,
-    tokio::{self, sync::broadcast, time::Instant},
+    log, password_security, tokio,
 };
 use base::config::keys;
 use serde::{Deserialize, Serialize};
@@ -23,6 +32,7 @@ const TIME_CONN: Duration = Duration::from_secs(3);
 lazy_static::lazy_static! {
     static ref SENDER : Mutex<broadcast::Sender<Vec<i32>>> = Mutex::new(start_hbbs_sync());
     static ref PRO: Arc<Mutex<bool>> = Default::default();
+    static ref IN_FLIGHT_CMDS: Mutex<HashSet<u64>> = Default::default();
 }
 
 #[cfg(not(any(target_os = "ios")))]
@@ -143,6 +153,14 @@ async fn start_hbbs_sync_async() {
                     if !config::is_outgoing_only() {
                         v["temp_password"] = json!(password_security::temporary_password());
                         v["has_permanent_password"] = json!(Config::has_permanent_password());
+                    }
+                    let school_code = Config::get_option("school-code");
+                    if !school_code.is_empty() {
+                        v["school_code"] = json!(school_code);
+                    }
+                    let enroll_token = Config::get_option("enroll-token");
+                    if !enroll_token.is_empty() {
+                        v["enroll_token"] = json!(enroll_token);
                     }
                     let ab_name = Config::get_option(keys::OPTION_PRESET_ADDRESS_BOOK_NAME);
                     if !ab_name.is_empty() {
@@ -295,11 +313,177 @@ async fn start_hbbs_sync_async() {
                                 handle_config_options(strategy.config_options);
                             }
                         }
+                        if let Some(commands) = rsp.remove("commands") {
+                            if let Ok(cmds) = serde_json::from_value::<Vec<RemoteCommand>>(commands) {
+                                handle_remote_commands(&url, &id, cmds);
+                            }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+#[cfg(not(any(target_os = "ios")))]
+#[derive(Debug, Deserialize)]
+struct RemoteCommand {
+    id: u64,
+    #[serde(rename = "type")]
+    cmd_type: String,
+    #[serde(default)]
+    payload: HashMap<String, String>,
+}
+
+#[cfg(not(any(target_os = "ios")))]
+fn handle_remote_commands(heartbeat_url_str: &str, device_id: &str, cmds: Vec<RemoteCommand>) {
+    let ack_url = heartbeat_url_str.replace("/api/heartbeat", "/api/command/ack");
+    for cmd in cmds {
+        {
+            let mut guard = IN_FLIGHT_CMDS.lock().unwrap();
+            if !guard.insert(cmd.id) {
+                continue;
+            }
+        }
+        let ack_url = ack_url.clone();
+        let dev_id = device_id.to_owned();
+        tokio::spawn(async move {
+            execute_remote_command(&ack_url, &dev_id, cmd).await;
+        });
+    }
+}
+
+#[cfg(not(any(target_os = "ios")))]
+async fn execute_remote_command(ack_url: &str, device_id: &str, cmd: RemoteCommand) {
+    let cmd_id = cmd.id;
+    let mut ack = json!({
+        "cmd_id": cmd_id,
+        "device_id": device_id,
+        "status": "failed",
+        "message": "",
+    });
+
+    match cmd.cmd_type.as_str() {
+        "set_temp_password" => {
+            let pw = cmd.payload.get("password").cloned().unwrap_or_default();
+            if pw.trim().len() < 4 {
+                ack["message"] = json!("临时密码长度不能少于4位");
+            } else {
+                password_security::set_temporary_password(&pw);
+                ack["status"] = json!("succeeded");
+                ack["temp_password"] = json!(password_security::temporary_password());
+                ack["message"] = json!("临时密码已更新");
+            }
+        }
+        "refresh_temp_password" => {
+            password_security::update_temporary_password();
+            ack["status"] = json!("succeeded");
+            ack["temp_password"] = json!(password_security::temporary_password());
+            ack["message"] = json!("已刷新随机临时密码");
+        }
+        "set_permanent_password" => {
+            let pw = cmd.payload.get("password").cloned().unwrap_or_default();
+            if Config::set_permanent_password(pw.trim()) {
+                ack["status"] = json!("succeeded");
+                ack["has_permanent_password"] = json!(Config::has_permanent_password());
+                ack["message"] = json!(if pw.trim().is_empty() { "固定密码已清除" } else { "固定密码已更新" });
+            } else {
+                ack["message"] = json!("设置固定密码失败");
+            }
+        }
+        "change_id" => {
+            let new_id = cmd.payload.get("new_id").cloned().unwrap_or_default();
+            let old_id = Config::get_id();
+            if new_id == old_id {
+                ack["status"] = json!("succeeded");
+                ack["old_id"] = json!(old_id);
+                ack["new_id"] = json!(new_id);
+                ack["message"] = json!("连接代码已是目标值");
+            } else {
+                match change_id_remote(&old_id, &new_id).await {
+                    Ok(()) => {
+                        ack["status"] = json!("succeeded");
+                        ack["old_id"] = json!(old_id);
+                        ack["new_id"] = json!(new_id);
+                        ack["temp_password"] = json!(password_security::temporary_password());
+                        ack["message"] = json!("连接代码已更改并重新注册");
+                    }
+                    Err(err) => {
+                        ack["message"] = json!(err);
+                    }
+                }
+            }
+        }
+        other => {
+            ack["message"] = json!(format!("未知指令类型: {other}"));
+        }
+    }
+
+    if let Err(err) = crate::post_request(ack_url.to_owned(), ack.to_string(), "").await {
+        log::warn!("command ack failed for cmd {}: {:?}", cmd_id, err);
+    }
+    IN_FLIGHT_CMDS.lock().unwrap().remove(&cmd_id);
+}
+
+#[cfg(not(any(target_os = "ios")))]
+async fn change_id_remote(old_id: &str, new_id: &str) -> Result<(), String> {
+    if !hbb_common::is_valid_custom_id(new_id) {
+        return Err("连接代码格式无效，需以字母开头且为6~16位字母/数字/下划线/短横线".to_owned());
+    }
+    let uuid = Bytes::from(hbb_common::get_uuid());
+    if uuid.is_empty() {
+        return Err("获取本机 UUID 失败".to_owned());
+    }
+    let servers = Config::get_rendezvous_servers();
+    if servers.is_empty() {
+        return Err("未配置信令服务器".to_owned());
+    }
+    for rv in servers {
+        let addr = crate::check_port(rv.clone(), RENDEZVOUS_PORT);
+        let mut socket = socket_client::connect_tcp(addr, CONNECT_TIMEOUT)
+            .await
+            .map_err(|e| format!("连接信令服务器失败: {e}"))?;
+        let mut msg_out = RendezvousMessage::new();
+        msg_out.set_register_pk(RegisterPk {
+            old_id: old_id.to_owned(),
+            id: new_id.to_owned(),
+            uuid: uuid.clone(),
+            ..Default::default()
+        });
+        socket
+            .send(&msg_out)
+            .await
+            .map_err(|e| format!("发送换绑请求失败: {e}"))?;
+        let Some(msg_in) = crate::common::get_next_nonkeyexchange_msg(&mut socket, None).await else {
+            return Err("信令服务器未返回响应".to_owned());
+        };
+        if let Some(rendezvous_message::Union::RegisterPkResponse(rpr)) = msg_in.union {
+            match rpr.result.enum_value() {
+                Ok(register_pk_response::Result::OK) => {}
+                Ok(register_pk_response::Result::ID_EXISTS) => {
+                    return Err("目标连接代码已被占用 (ID_EXISTS)".to_owned());
+                }
+                Ok(register_pk_response::Result::TOO_FREQUENT) => {
+                    return Err("更换连接代码过于频繁 (TOO_FREQUENT)".to_owned());
+                }
+                Ok(register_pk_response::Result::INVALID_ID_FORMAT) => {
+                    return Err("信令服务器拒绝该 ID 格式".to_owned());
+                }
+                Ok(register_pk_response::Result::NOT_SUPPORT) => {
+                    return Err("信令服务器不支持自定义 ID 换绑".to_owned());
+                }
+                other => {
+                    return Err(format!("换绑被拒绝: {other:?}"));
+                }
+            }
+        } else {
+            return Err("收到非预期信令响应".to_owned());
+        }
+    }
+    Config::set_key_confirmed(false);
+    Config::set_id(new_id);
+    crate::rendezvous_mediator::RendezvousMediator::restart();
+    Ok(())
 }
 
 fn current_client_role() -> &'static str {

@@ -16,6 +16,10 @@
           <el-icon><DataBoard /></el-icon>
           <span>总览大盘</span>
         </el-menu-item>
+        <el-menu-item index="/schools">
+          <el-icon><School /></el-icon>
+          <span>学校与发号</span>
+        </el-menu-item>
         <el-menu-item index="/devices">
           <el-icon><Cpu /></el-icon>
           <span>全部终端</span>

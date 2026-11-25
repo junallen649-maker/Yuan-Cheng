@@ -1,15 +1,58 @@
 <template>
   <div class="polaris-card page-box">
     <div class="toolbar">
-      <div class="desc">通过机房/分组统一下发无人值守与安全策略，客户端将在 15 秒内自动同步</div>
+      <div class="left-tools">
+        <el-select v-if="isSuperAdmin" v-model="filterSchoolId" style="width: 170px" @change="load">
+          <el-option label="全部学校" :value="0" />
+          <el-option v-for="s in schools" :key="s.id" :label="s.name" :value="s.id" />
+        </el-select>
+        <div class="desc">
+          按学校与机房分类管理策略；<b>双击“所属学校”或“分组名称”可直接改名</b>
+        </div>
+      </div>
       <el-button type="primary" @click="openDialog()">新建机房分组</el-button>
     </div>
 
     <el-table :data="groups" v-loading="loading" stripe>
-      <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="name" label="分组名称" width="180" />
-      <el-table-column prop="description" label="说明" min-width="200" />
-      <el-table-column prop="device_count" label="设备数" width="90" align="center" />
+      <el-table-column prop="id" label="ID" width="65" />
+      <el-table-column label="所属学校（双击可改校名）" min-width="165">
+        <template #default="{ row }">
+          <div v-if="editingSchoolRowId === row.id">
+            <el-input
+              ref="schoolInputRef"
+              v-model="editingSchoolName"
+              size="small"
+              @keyup.enter="saveInlineSchoolRename(row)"
+              @keyup.esc="editingSchoolRowId = null"
+              @blur="saveInlineSchoolRename(row)"
+            />
+          </div>
+          <div v-else class="dbl-rename-cell" title="双击修改学校名称" @dblclick="startInlineSchoolRename(row)">
+            <el-tag size="small" type="primary" effect="plain">{{ row.school_name || '默认学校' }}</el-tag>
+            <el-icon class="edit-hint"><EditPen /></el-icon>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column label="分组名称（双击可改名）" min-width="180">
+        <template #default="{ row }">
+          <div v-if="editingGroupRowId === row.id">
+            <el-input
+              ref="groupInputRef"
+              v-model="editingGroupName"
+              size="small"
+              @keyup.enter="saveInlineGroupRename(row)"
+              @keyup.esc="editingGroupRowId = null"
+              @blur="saveInlineGroupRename(row)"
+            />
+          </div>
+          <div v-else class="dbl-rename-cell" title="双击修改分组名称" @dblclick="startInlineGroupRename(row)">
+            <span class="bold">{{ row.name }}</span>
+            <el-icon class="edit-hint"><EditPen /></el-icon>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column prop="description" label="说明" min-width="170" />
+      <el-table-column prop="device_count" label="设备数" width="80" align="center" />
       <el-table-column label="验证模式" width="160">
         <template #default="{ row }">
           <el-tag size="small" effect="plain">
@@ -17,19 +60,20 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="权限策略" min-width="220">
+      <el-table-column label="权限策略" min-width="190">
         <template #default="{ row }">
           <el-tag v-if="row.strategy?.['enable-file-transfer'] === 'N'" size="small" type="info" style="margin-right: 4px">禁传文件</el-tag>
           <el-tag v-if="row.strategy?.['enable-clipboard'] === 'N'" size="small" type="info" style="margin-right: 4px">禁剪贴板</el-tag>
           <el-tag v-if="row.strategy?.['disable-settings'] === 'Y'" size="small" type="warning">锁定设置</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="150" fixed="right">
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDialog(row)">配置策略</el-button>
+          <el-button link type="warning" @click="openGroupPasswordDialog(row)">整组改密</el-button>
           <el-popconfirm
             v-if="row.id > 2"
-            title="删除后该分组设备将移回默认机房，确认删除？"
+            title="删除后该分组设备将移回本校默认机房，确认删除？"
             @confirm="deleteGroup(row.id)"
           >
             <template #reference>
@@ -42,6 +86,11 @@
 
     <el-dialog v-model="dialogVisible" :title="form.id ? '配置分组与策略' : '新建机房分组'" width="540px">
       <el-form :model="form" label-width="135px">
+        <el-form-item v-if="isSuperAdmin" label="所属学校">
+          <el-select v-model="form.school_id" style="width: 100%">
+            <el-option v-for="s in schools" :key="s.id" :label="s.name" :value="s.id" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="分组名称">
           <el-input v-model="form.name" placeholder="例如：一号教学楼-101机房" />
         </el-form-item>
@@ -61,8 +110,8 @@
         </el-form-item>
         <el-form-item label="密码类型">
           <el-select v-model="form.strategy['verification-method']" style="width: 100%">
-            <el-option label="仅使用固定密码" value="use-permanent-password" />
             <el-option label="同时支持固定与临时密码" value="use-both-passwords" />
+            <el-option label="仅使用固定密码" value="use-permanent-password" />
             <el-option label="仅使用临时密码" value="use-temporary-password" />
           </el-select>
         </el-form-item>
@@ -84,20 +133,68 @@
         <el-button type="primary" @click="saveGroup">保存并下发</el-button>
       </template>
     </el-dialog>
+
+    <!-- 整组批量改密弹窗 -->
+    <el-dialog v-model="pwdDialogVisible" :title="`整组下发密码 - ${pwdForm.groupName}`" width="440px">
+      <el-form :model="pwdForm" label-width="110px">
+        <el-form-item label="改密类型">
+          <el-select v-model="pwdForm.type" style="width: 100%">
+            <el-option label="设置统一固定密码（推荐）" value="set_permanent_password" />
+            <el-option label="设置统一临时密码" value="set_temp_password" />
+            <el-option label="全组随机刷新临时密码" value="refresh_temp_password" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="pwdForm.type !== 'refresh_temp_password'" label="新密码">
+          <el-input v-model="pwdForm.password" show-password placeholder="固定密码>=6位，临时密码>=4位" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="pwdDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitGroupPassword">下发到全组终端</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@/api/client'
 
 const loading = ref(false)
 const groups = ref<any[]>([])
+const schools = ref<any[]>([])
+const filterSchoolId = ref(0)
 const dialogVisible = ref(false)
+
+const editingGroupRowId = ref<number | null>(null)
+const editingGroupName = ref('')
+const groupInputRef = ref<any>()
+
+const editingSchoolRowId = ref<number | null>(null)
+const editingSchoolName = ref('')
+const schoolInputRef = ref<any>()
+
+const pwdDialogVisible = ref(false)
+const pwdForm = reactive({
+  groupId: 0,
+  groupName: '',
+  type: 'set_permanent_password',
+  password: ''
+})
+
+const user = computed(() => {
+  try {
+    return JSON.parse(localStorage.getItem('polaris_admin_user') || '{}')
+  } catch {
+    return {}
+  }
+})
+const isSuperAdmin = computed(() => (user.value?.school_id || 0) === 0 && (user.value?.is_admin || user.value?.role === 'admin'))
 
 const form = reactive<any>({
   id: 0,
+  school_id: 1,
   name: '',
   description: '',
   unattended_pass: '',
@@ -111,19 +208,61 @@ const form = reactive<any>({
   }
 })
 
+async function loadSchools() {
+  const res: any = await api.get('/schools')
+  schools.value = res.items || []
+}
+
 async function load() {
   loading.value = true
   try {
-    const res: any = await api.get('/groups')
+    const res: any = await api.get('/groups', { params: { school_id: filterSchoolId.value } })
     groups.value = res.items || []
   } finally {
     loading.value = false
   }
 }
 
+function startInlineGroupRename(row: any) {
+  editingGroupRowId.value = row.id
+  editingGroupName.value = row.name
+  nextTick(() => {
+    groupInputRef.value?.focus?.()
+  })
+}
+
+async function saveInlineGroupRename(row: any) {
+  if (editingGroupRowId.value !== row.id) return
+  const newName = editingGroupName.value.trim()
+  editingGroupRowId.value = null
+  if (!newName || newName === row.name) return
+  await api.put(`/groups/${row.id}`, { name: newName })
+  row.name = newName
+  ElMessage.success(`分组名称已改为：${newName}`)
+}
+
+function startInlineSchoolRename(row: any) {
+  editingSchoolRowId.value = row.id
+  editingSchoolName.value = row.school_name || '默认学校'
+  nextTick(() => {
+    schoolInputRef.value?.focus?.()
+  })
+}
+
+async function saveInlineSchoolRename(row: any) {
+  if (editingSchoolRowId.value !== row.id) return
+  const newName = editingSchoolName.value.trim()
+  editingSchoolRowId.value = null
+  if (!newName || newName === row.school_name) return
+  await api.put(`/schools/${row.school_id}`, { name: newName })
+  ElMessage.success(`学校名称已改为：${newName}`)
+  await Promise.all([loadSchools(), load()])
+}
+
 function openDialog(row?: any) {
   if (row) {
     form.id = row.id
+    form.school_id = row.school_id || 1
     form.name = row.name
     form.description = row.description || ''
     form.unattended_pass = row.unattended_pass || ''
@@ -138,6 +277,7 @@ function openDialog(row?: any) {
     }
   } else {
     form.id = 0
+    form.school_id = filterSchoolId.value || (schools.value[0]?.id || 1)
     form.name = ''
     form.description = ''
     form.unattended_pass = ''
@@ -168,13 +308,35 @@ async function saveGroup() {
   load()
 }
 
+function openGroupPasswordDialog(row: any) {
+  pwdForm.groupId = row.id
+  pwdForm.groupName = row.name
+  pwdForm.type = 'set_permanent_password'
+  pwdForm.password = ''
+  pwdDialogVisible.value = true
+}
+
+async function submitGroupPassword() {
+  const res: any = await api.post('/devices/batch-password', {
+    type: pwdForm.type,
+    password: pwdForm.password,
+    group_id: pwdForm.groupId
+  })
+  ElMessage.success(`已向该分组 ${res.queued || 0} 台终端下发改密指令`)
+  pwdDialogVisible.value = false
+  load()
+}
+
 async function deleteGroup(id: number) {
   await api.delete(`/groups/${id}`)
   ElMessage.success('已删除分组')
   load()
 }
 
-onMounted(load)
+onMounted(() => {
+  loadSchools()
+  load()
+})
 </script>
 
 <style scoped>
@@ -183,10 +345,35 @@ onMounted(load)
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   margin-bottom: 16px;
+}
+.left-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 .desc {
   font-size: 13px;
   color: var(--polaris-muted);
 }
+.dbl-rename-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: background-color 0.15s;
+}
+.dbl-rename-cell:hover {
+  background: #f1f5f9;
+}
+.edit-hint {
+  color: #94a3b8;
+  font-size: 13px;
+}
+.bold { font-weight: 600; }
 </style>

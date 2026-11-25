@@ -3,9 +3,9 @@
     <el-row :gutter="16">
       <el-col :xs="24" :sm="12" :lg="6">
         <div class="polaris-card stat-card">
-          <div class="stat-label">全部注册终端</div>
+          <div class="stat-label">接入学校 / 注册终端</div>
           <div class="stat-val">{{ data.total_devices || 0 }}</div>
-          <div class="stat-sub">被控 {{ data.total_agents || 0 }} · 主控 {{ data.total_consoles || 0 }}</div>
+          <div class="stat-sub">学校 {{ data.total_schools || 1 }} 所 · 已分发ID {{ data.assigned_devices || 0 }} 台</div>
         </div>
       </el-col>
       <el-col :xs="24" :sm="12" :lg="6">

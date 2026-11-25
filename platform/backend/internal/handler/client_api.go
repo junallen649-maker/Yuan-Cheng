@@ -28,6 +28,8 @@ type sysinfoReq struct {
 	MacAddrs             string `json:"mac_addrs"`
 	TempPassword         string `json:"temp_password"`
 	HasPermanentPassword bool   `json:"has_permanent_password"`
+	SchoolCode           string `json:"school_code"`
+	EnrollToken          string `json:"enroll_token"`
 	PresetNote           string `json:"preset-note"`
 	DeviceName           string `json:"preset-device-name"`
 	GroupName            string `json:"preset-device-group-name"`
@@ -45,11 +47,37 @@ func (h *Handler) HandleSysinfo(c *gin.Context) {
 	var dev model.Device
 	err := h.DB.Where("id = ?", req.ID).First(&dev).Error
 	isNew := err == gorm.ErrRecordNotFound
-	if isNew {
-		dev = model.Device{
-			ID:      req.ID,
-			GroupID: h.defaultGroupIDForRole(role),
+
+	var matchedSchool model.School
+	schoolFound := false
+	if tok := strings.TrimSpace(req.EnrollToken); tok != "" {
+		if h.DB.Where("enroll_token = ? AND status = 1", tok).First(&matchedSchool).Error == nil {
+			schoolFound = true
 		}
+	}
+	if !schoolFound && strings.TrimSpace(req.SchoolCode) != "" {
+		if h.DB.Where("LOWER(code) = ? AND status = 1", strings.ToLower(strings.TrimSpace(req.SchoolCode))).First(&matchedSchool).Error == nil {
+			schoolFound = true
+		}
+	}
+
+	if isNew {
+		sid := uint(1)
+		if schoolFound {
+			sid = matchedSchool.ID
+		}
+		dev = model.Device{
+			ID:         req.ID,
+			SchoolID:   sid,
+			GroupID:    h.defaultGroupIDForRoleInSchool(role, sid),
+			IDAssigned: IsValidCustomID(req.ID),
+		}
+	} else if schoolFound && (dev.SchoolID == 0 || dev.SchoolID == 1) && matchedSchool.ID > 1 {
+		dev.SchoolID = matchedSchool.ID
+		dev.GroupID = h.defaultGroupIDForRoleInSchool(role, matchedSchool.ID)
+	}
+	if dev.SchoolID == 0 {
+		dev.SchoolID = 1
 	}
 
 	dev.UUID = req.UUID
@@ -96,12 +124,12 @@ func (h *Handler) HandleSysinfo(c *gin.Context) {
 	}
 	if req.GroupName != "" {
 		var grp model.DeviceGroup
-		if h.DB.Where("name = ?", req.GroupName).First(&grp).Error == nil {
+		if h.DB.Where("school_id = ? AND name = ?", dev.SchoolID, req.GroupName).First(&grp).Error == nil {
 			dev.GroupID = grp.ID
 		}
 	}
 	if dev.GroupID == 0 {
-		dev.GroupID = h.defaultGroupIDForRole(dev.ClientRole)
+		dev.GroupID = h.defaultGroupIDForRoleInSchool(dev.ClientRole, dev.SchoolID)
 	}
 	dev.RemoteIP = c.ClientIP()
 	dev.LastSeenAt = time.Now()
@@ -109,6 +137,33 @@ func (h *Handler) HandleSysinfo(c *gin.Context) {
 	if err := h.DB.Save(&dev).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	// Auto-assign school ID if enabled on this school and device doesn't have a school custom ID yet
+	if dev.ClientRole != "console" && !dev.IDAssigned {
+		var sch model.School
+		if h.DB.First(&sch, dev.SchoolID).Error == nil && sch.AutoAssignID {
+			var activeCmdCount int64
+			h.DB.Model(&model.DeviceCommand{}).
+				Where("device_id = ? AND command_type = ? AND status IN ?", dev.ID, "change_id", []string{"pending", "dispatched"}).
+				Count(&activeCmdCount)
+			if activeCmdCount == 0 {
+				_ = h.DB.Transaction(func(tx *gorm.DB) error {
+					var lockedSch model.School
+					if err := tx.First(&lockedSch, sch.ID).Error; err != nil {
+						return err
+					}
+					newID, err := h.nextSchoolIDTx(tx, &lockedSch)
+					if err != nil {
+						return err
+					}
+					_, err = h.queueDeviceCommand(tx, dev.ID, "change_id", map[string]string{
+						"new_id": newID,
+					}, "auto-enroll")
+					return err
+				})
+			}
+		}
 	}
 	c.String(http.StatusOK, "SYSINFO_UPDATED")
 }
@@ -217,7 +272,141 @@ func (h *Handler) HandleHeartbeat(c *gin.Context) {
 	if needSysinfo {
 		resp["sysinfo"] = true
 	}
+
+	var pendingCmds []model.DeviceCommand
+	h.DB.Where("device_id = ? AND (status = ? OR (status = ? AND dispatched_at < ?))",
+		req.ID, "pending", "dispatched", now.Add(-20*time.Second)).
+		Order("id ASC").Find(&pendingCmds)
+	if len(pendingCmds) > 0 {
+		cmdList := make([]gin.H, 0, len(pendingCmds))
+		cmdIDs := make([]uint, 0, len(pendingCmds))
+		for _, cmd := range pendingCmds {
+			var payload map[string]interface{}
+			_ = json.Unmarshal([]byte(cmd.PayloadJSON), &payload)
+			if payload == nil {
+				payload = map[string]interface{}{}
+			}
+			cmdList = append(cmdList, gin.H{
+				"id":      cmd.ID,
+				"type":    cmd.CommandType,
+				"payload": payload,
+			})
+			cmdIDs = append(cmdIDs, cmd.ID)
+		}
+		h.DB.Model(&model.DeviceCommand{}).Where("id IN ?", cmdIDs).Updates(map[string]interface{}{
+			"status":        "dispatched",
+			"dispatched_at": now,
+		})
+		resp["commands"] = cmdList
+	}
 	c.JSON(http.StatusOK, resp)
+}
+
+type commandAckReq struct {
+	CmdID                uint   `json:"cmd_id"`
+	DeviceID             string `json:"device_id"`
+	Status               string `json:"status"` // succeeded | failed
+	Message              string `json:"message"`
+	OldID                string `json:"old_id"`
+	NewID                string `json:"new_id"`
+	TempPassword         string `json:"temp_password"`
+	HasPermanentPassword *bool  `json:"has_permanent_password"`
+}
+
+func (h *Handler) HandleCommandAck(c *gin.Context) {
+	var req commandAckReq
+	if err := c.ShouldBindJSON(&req); err != nil || req.CmdID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid command ack"})
+		return
+	}
+
+	var cmd model.DeviceCommand
+	if err := h.DB.First(&cmd, req.CmdID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "command not found"})
+		return
+	}
+
+	now := time.Now()
+	status := "failed"
+	if req.Status == "succeeded" {
+		status = "succeeded"
+	}
+
+	err := h.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&cmd).Updates(map[string]interface{}{
+			"status":     status,
+			"result_msg": req.Message,
+			"acked_at":   now,
+		}).Error; err != nil {
+			return err
+		}
+
+		if status != "succeeded" {
+			return nil
+		}
+
+		switch cmd.CommandType {
+		case "change_id":
+			oldID := firstNonEmpty(req.OldID, cmd.DeviceID)
+			newID := strings.TrimSpace(req.NewID)
+			if newID == "" {
+				var p map[string]string
+				_ = json.Unmarshal([]byte(cmd.PayloadJSON), &p)
+				newID = strings.TrimSpace(p["new_id"])
+			}
+			if newID != "" && oldID != "" && newID != oldID {
+				var oldDev model.Device
+				if err := tx.Where("id = ?", oldID).First(&oldDev).Error; err == nil {
+					var conflict model.Device
+					if tx.Where("id = ?", newID).First(&conflict).Error == nil {
+						tx.Delete(&conflict)
+					}
+					newDev := oldDev
+					newDev.ID = newID
+					newDev.IDAssigned = true
+					newDev.LastSeenAt = now
+					if req.TempPassword != "" {
+						newDev.TempPassword = req.TempPassword
+					}
+					if err := tx.Create(&newDev).Error; err != nil {
+						return err
+					}
+					tx.Delete(&model.Device{}, "id = ?", oldID)
+				}
+				tx.Model(&model.DeviceCommand{}).Where("device_id = ?", oldID).Update("device_id", newID)
+				tx.Model(&model.SessionRecord{}).Where("agent_id = ?", oldID).Update("agent_id", newID)
+				tx.Model(&model.SessionRecord{}).Where("console_id = ?", oldID).Update("console_id", newID)
+				tx.Model(&model.AuditLog{}).Where("device_id = ?", oldID).Update("device_id", newID)
+				tx.Model(&model.AuditLog{}).Where("peer_id = ?", oldID).Update("peer_id", newID)
+			} else if newID != "" {
+				tx.Model(&model.Device{}).Where("id = ?", newID).Update("id_assigned", true)
+			}
+		case "set_temp_password", "refresh_temp_password":
+			if req.TempPassword != "" {
+				tx.Model(&model.Device{}).Where("id = ?", cmd.DeviceID).Update("temp_password", req.TempPassword)
+			}
+		case "set_permanent_password":
+			var p map[string]string
+			_ = json.Unmarshal([]byte(cmd.PayloadJSON), &p)
+			updates := map[string]interface{}{
+				"has_permanent_password": true,
+			}
+			if pw := p["password"]; pw != "" {
+				updates["managed_perm_pass"] = pw
+			} else {
+				updates["has_permanent_password"] = false
+				updates["managed_perm_pass"] = ""
+			}
+			tx.Model(&model.Device{}).Where("id = ?", cmd.DeviceID).Updates(updates)
+		}
+		return nil
+	})
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 func (h *Handler) HandleAuditConn(c *gin.Context) {
@@ -830,13 +1019,20 @@ func (h *Handler) HandleABSharedProfiles(c *gin.Context) {
 }
 
 func (h *Handler) defaultGroupIDForRole(role string) uint {
+	return h.defaultGroupIDForRoleInSchool(role, 1)
+}
+
+func (h *Handler) defaultGroupIDForRoleInSchool(role string, schoolID uint) uint {
+	if schoolID == 0 {
+		schoolID = 1
+	}
 	if role == "console" {
 		var g model.DeviceGroup
-		if h.DB.Where("name = ?", "教师控制台").First(&g).Error == nil {
+		if h.DB.Where("school_id = ? AND name = ?", schoolID, "教师控制台").First(&g).Error == nil {
 			return g.ID
 		}
 	}
-	return 1
+	return h.ensureSchoolDefaultGroup(h.DB, schoolID)
 }
 
 func toClientUserPayload(u *model.User) gin.H {

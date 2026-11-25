@@ -52,45 +52,69 @@ pub fn core_main() -> Option<Vec<String>> {
     let mut has_agent_flag = false;
     let mut has_hidden_flag = false;
     let mut has_show_ui_flag = false;
-    for arg in std::env::args() {
-        if i == 0 {
-            arg_exe = arg;
-        } else if i > 0 {
-            #[cfg(feature = "flutter")]
-            if [
-                "--connect",
-                "--play",
-                "--file-transfer",
-                "--view-camera",
-                "--port-forward",
-                "--terminal",
-                "--rdp",
-            ]
-            .contains(&arg.as_str())
-            {
-                _is_flutter_invoke_new_connection = true;
-            }
-            if arg == "--elevate" {
-                _is_elevate = true;
-            } else if arg == "--run-as-system" {
-                _is_run_as_system = true;
-            } else if arg == "--quick_support" {
-                _is_quick_support = true;
-            } else if arg == "--no-server" {
-                no_server = true;
-            } else if arg == "--console" || arg == "--outgoing" {
-                has_console_flag = true;
-            } else if arg == "--agent" || arg == "--incoming" {
-                has_agent_flag = true;
-            } else if arg == "--hidden" {
-                has_hidden_flag = true;
-            } else if arg == "--show-ui" {
-                has_show_ui_flag = true;
-            } else {
-                args.push(arg);
-            }
+    let mut school_code_arg: Option<String> = None;
+    let mut enroll_token_arg: Option<String> = None;
+    let mut raw_args = std::env::args();
+    if let Some(exe) = raw_args.next() {
+        arg_exe = exe;
+    }
+    while let Some(arg) = raw_args.next() {
+        #[cfg(feature = "flutter")]
+        if [
+            "--connect",
+            "--play",
+            "--file-transfer",
+            "--view-camera",
+            "--port-forward",
+            "--terminal",
+            "--rdp",
+        ]
+        .contains(&arg.as_str())
+        {
+            _is_flutter_invoke_new_connection = true;
         }
-        i += 1;
+        if arg == "--elevate" {
+            _is_elevate = true;
+        } else if arg == "--run-as-system" {
+            _is_run_as_system = true;
+        } else if arg == "--quick_support" {
+            _is_quick_support = true;
+        } else if arg == "--no-server" {
+            no_server = true;
+        } else if arg == "--console" || arg == "--outgoing" {
+            has_console_flag = true;
+        } else if arg == "--agent" || arg == "--incoming" {
+            has_agent_flag = true;
+        } else if arg == "--hidden" {
+            has_hidden_flag = true;
+        } else if arg == "--show-ui" {
+            has_show_ui_flag = true;
+        } else if let Some(val) = arg.strip_prefix("--school=") {
+            school_code_arg = Some(val.to_string());
+        } else if arg == "--school" {
+            if let Some(val) = raw_args.next() {
+                school_code_arg = Some(val);
+            }
+        } else if let Some(val) = arg.strip_prefix("--enroll-token=") {
+            enroll_token_arg = Some(val.to_string());
+        } else if arg == "--enroll-token" {
+            if let Some(val) = raw_args.next() {
+                enroll_token_arg = Some(val);
+            }
+        } else {
+            args.push(arg);
+        }
+    }
+    let _ = i;
+    if let Some(code) = school_code_arg {
+        if !code.trim().is_empty() {
+            config::Config::set_option("school-code".to_string(), code.trim().to_string());
+        }
+    }
+    if let Some(tok) = enroll_token_arg {
+        if !tok.trim().is_empty() {
+            config::Config::set_option("enroll-token".to_string(), tok.trim().to_string());
+        }
     }
     let lower_exe = arg_exe.to_lowercase();
     let env_appname = std::env::var("POLARIS_APPNAME")

@@ -35,6 +35,16 @@ pub fn update_temporary_password() {
 }
 
 // Should only be called in server
+pub fn set_temporary_password(pw: &str) {
+    let trimmed = pw.trim();
+    if trimmed.is_empty() {
+        update_temporary_password();
+    } else {
+        *TEMPORARY_PASSWORD.write().unwrap() = trimmed.to_owned();
+    }
+}
+
+// Should only be called in server
 pub fn temporary_password() -> String {
     TEMPORARY_PASSWORD.read().unwrap().clone()
 }
