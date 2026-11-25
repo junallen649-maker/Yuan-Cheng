@@ -1605,6 +1605,8 @@ impl<T: InvokeUiSession> Remote<T> {
                     Some(login_response::Union::PeerInfo(pi)) => {
                         let peer_version = pi.version.clone();
                         let peer_platform = pi.platform.clone();
+                        let peer_hostname = pi.hostname.clone();
+                        let peer_username = pi.username.clone();
                         self.set_peer_info(&pi);
                         if self.handler.is_view_camera() {
                             if !self.check_view_camera_support(&peer_version, &peer_platform) {
@@ -1684,9 +1686,9 @@ impl<T: InvokeUiSession> Remote<T> {
                             };
                             crate::hbbs_http::sync::report_outgoing_session(
                                 self.handler.get_id(),
-                                pi.hostname.clone(),
-                                pi.platform.clone(),
-                                pi.username.clone(),
+                                peer_hostname,
+                                peer_platform,
+                                peer_username,
                                 ct,
                                 "open",
                                 nonce.clone(),
