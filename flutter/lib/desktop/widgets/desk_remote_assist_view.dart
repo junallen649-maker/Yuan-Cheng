@@ -567,7 +567,7 @@ class _DeskRemoteAssistViewState extends State<DeskRemoteAssistView> {
                     child: _buildMetricTile(
                       isDark: isDark,
                       title: '接入专线节点',
-                      value: '8.138.129.79',
+                      value: 'easyreach.asia',
                       icon: Icons.hub_rounded,
                       color: const Color(0xFF8B5CF6),
                     ),

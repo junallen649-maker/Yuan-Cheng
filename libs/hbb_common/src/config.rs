@@ -114,7 +114,7 @@ const CHARS: &[char] = &[
     'm', 'n', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 ];
 
-pub const RENDEZVOUS_SERVERS: &[&str] = &["8.138.129.79"];
+pub const RENDEZVOUS_SERVERS: &[&str] = &["easyreach.asia", "8.138.129.79"];
 pub const RS_PUB_KEY: &str = "4X5pVV3YQWzlT8LsiNAqmFocdB6cPf+J+rW3CKdESzQ=";
 
 pub const RENDEZVOUS_PORT: i32 = 21116;

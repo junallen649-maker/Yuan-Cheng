@@ -45,7 +45,7 @@
       <div class="sidebar-footer">
         <div class="status-pill">
           <span class="dot"></span>
-          <span>8.138.129.79 在线</span>
+          <span>easyreach.asia 在线</span>
         </div>
       </div>
     </el-aside>

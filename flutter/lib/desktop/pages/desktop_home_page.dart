@@ -151,7 +151,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                       ),
                       Text(
                         bind.isIncomingOnly()
-                            ? '受控服务运行中 · 8.138.129.79'
+                            ? '受控服务运行中 · easyreach.asia'
                             : 'Polaris 资产管理与远程控制',
                         style: const TextStyle(
                           fontSize: 10,
@@ -365,7 +365,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      isReady ? '8.138.129.79 专线就绪' : '正在连接专线...',
+                      isReady ? 'easyreach.asia 专线就绪' : '正在连接专线...',
                       style: const TextStyle(fontSize: 11, color: Colors.grey),
                       overflow: TextOverflow.ellipsis,
                     ),
