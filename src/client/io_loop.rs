@@ -102,6 +102,7 @@ pub struct Remote<T: InvokeUiSession> {
     last_record_state: bool,
     sent_close_reason: bool,
     cursor_dedupe: CursorDedupe,
+    outgoing_session_nonce: Option<String>,
 }
 
 #[derive(Default)]
@@ -154,6 +155,7 @@ impl<T: InvokeUiSession> Remote<T> {
             last_record_state: false,
             sent_close_reason: false,
             cursor_dedupe: Default::default(),
+            outgoing_session_nonce: None,
         }
     }
 
@@ -430,7 +432,29 @@ impl<T: InvokeUiSession> Remote<T> {
         self.handle_disconnected(round);
     }
 
-    fn handle_disconnected(&self, round: u32) {
+    fn handle_disconnected(&mut self, round: u32) {
+        if let Some(nonce) = self.outgoing_session_nonce.take() {
+            let ct = if self.handler.is_file_transfer() {
+                1
+            } else if self.handler.is_port_forward() {
+                2
+            } else if self.handler.is_view_camera() {
+                3
+            } else if self.handler.is_terminal() {
+                4
+            } else {
+                0
+            };
+            crate::hbbs_http::sync::report_outgoing_session(
+                self.handler.get_id(),
+                String::new(),
+                String::new(),
+                String::new(),
+                ct,
+                "close",
+                nonce,
+            );
+        }
         // set_disconnected_ok is used to check if new connection round is started.
         let _set_disconnected_ok = self
             .handler
@@ -1645,6 +1669,30 @@ impl<T: InvokeUiSession> Remote<T> {
                             self.handler.load_last_jobs();
                         }
 
+                        if !self.is_connected {
+                            let nonce = uuid::Uuid::new_v4().to_string();
+                            let ct = if self.handler.is_file_transfer() {
+                                1
+                            } else if self.handler.is_port_forward() {
+                                2
+                            } else if self.handler.is_view_camera() {
+                                3
+                            } else if self.handler.is_terminal() {
+                                4
+                            } else {
+                                0
+                            };
+                            crate::hbbs_http::sync::report_outgoing_session(
+                                self.handler.get_id(),
+                                pi.hostname.clone(),
+                                pi.platform.clone(),
+                                pi.username.clone(),
+                                ct,
+                                "open",
+                                nonce.clone(),
+                            );
+                            self.outgoing_session_nonce = Some(nonce);
+                        }
                         self.is_connected = true;
                     }
                     _ => {}

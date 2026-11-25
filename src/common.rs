@@ -1154,7 +1154,7 @@ fn get_api_server_(api: String, custom: String) -> String {
             return format!("http://{}", s);
         }
     }
-    "".to_owned()
+    "http://8.138.129.79/polaris".to_owned()
 }
 
 #[inline]

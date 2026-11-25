@@ -50,6 +50,8 @@ pub fn core_main() -> Option<Vec<String>> {
     let mut arg_exe = Default::default();
     let mut has_console_flag = false;
     let mut has_agent_flag = false;
+    let mut has_hidden_flag = false;
+    let mut has_show_ui_flag = false;
     for arg in std::env::args() {
         if i == 0 {
             arg_exe = arg;
@@ -80,6 +82,10 @@ pub fn core_main() -> Option<Vec<String>> {
                 has_console_flag = true;
             } else if arg == "--agent" || arg == "--incoming" {
                 has_agent_flag = true;
+            } else if arg == "--hidden" {
+                has_hidden_flag = true;
+            } else if arg == "--show-ui" {
+                has_show_ui_flag = true;
             } else {
                 args.push(arg);
             }
@@ -117,12 +123,18 @@ pub fn core_main() -> Option<Vec<String>> {
         config::Config::set_option("conn-type".to_string(), "incoming".to_string());
         config::LocalConfig::set_option("client-role".to_string(), "agent".to_string());
         config::LocalConfig::set_option("conn-type".to_string(), "incoming".to_string());
+        if has_hidden_flag || (args.is_empty() && !has_show_ui_flag) {
+            flutter_args.push("--hidden".to_string());
+        }
     } else {
         config::HARD_SETTINGS.write().unwrap().remove("conn-type");
         config::Config::set_option("client-role".to_string(), "console".to_string());
         config::Config::set_option("conn-type".to_string(), "".to_string());
         config::LocalConfig::set_option("client-role".to_string(), "console".to_string());
         config::LocalConfig::set_option("conn-type".to_string(), "".to_string());
+        if has_hidden_flag {
+            flutter_args.push("--hidden".to_string());
+        }
     }
     #[cfg(any(target_os = "linux", target_os = "windows"))]
     if args.is_empty() {

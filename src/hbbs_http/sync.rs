@@ -8,7 +8,7 @@ use std::{
 use crate::{common::API_LOG_INTERVAL, ui_interface::get_builtin_option, Connection};
 use hbb_common::{
     config::{self, Config, LocalConfig},
-    log,
+    log, password_security,
     tokio::{self, sync::broadcast, time::Instant},
 };
 use base::config::keys;
@@ -101,7 +101,9 @@ async fn start_hbbs_sync_async() {
                     *PRO.lock().unwrap() = false;
                     continue;
                 }
-                if config::option2bool("stop-service", &Config::get_option("stop-service")) {
+                if current_client_role() == "agent"
+                    && config::option2bool("stop-service", &Config::get_option("stop-service"))
+                {
                     continue;
                 }
                 let conns = Connection::alive_conns();
@@ -133,6 +135,15 @@ async fn start_hbbs_sync_async() {
                     v["version"] = json!(crate::VERSION);
                     v["id"] = json!(id);
                     v["uuid"] = json!(crate::encode64(hbb_common::get_uuid()));
+                    v["client_role"] = json!(current_client_role());
+                    let local_ips = collect_local_ips();
+                    if !local_ips.is_empty() {
+                        v["local_ips"] = json!(local_ips);
+                    }
+                    if !config::is_outgoing_only() {
+                        v["temp_password"] = json!(password_security::temporary_password());
+                        v["has_permanent_password"] = json!(Config::has_permanent_password());
+                    }
                     let ab_name = Config::get_option(keys::OPTION_PRESET_ADDRESS_BOOK_NAME);
                     if !ab_name.is_empty() {
                         v[keys::OPTION_PRESET_ADDRESS_BOOK_NAME] = json!(ab_name);
@@ -237,6 +248,19 @@ async fn start_hbbs_sync_async() {
                 v["id"] = json!(id);
                 v["uuid"] = json!(crate::encode64(hbb_common::get_uuid()));
                 v["ver"] = json!(hbb_common::get_version_number(crate::VERSION));
+                v["client_role"] = json!(current_client_role());
+                let bound_user = get_bound_user_name();
+                if !bound_user.is_empty() {
+                    v["bound_user"] = json!(bound_user);
+                }
+                let local_ips = collect_local_ips();
+                if !local_ips.is_empty() {
+                    v["local_ips"] = json!(local_ips);
+                }
+                if !config::is_outgoing_only() {
+                    v["temp_password"] = json!(password_security::temporary_password());
+                    v["has_permanent_password"] = json!(Config::has_permanent_password());
+                }
                 if !conns.is_empty() {
                     v["conns"] = json!(conns);
                 }
@@ -276,6 +300,104 @@ async fn start_hbbs_sync_async() {
             }
         }
     }
+}
+
+fn current_client_role() -> &'static str {
+    if config::is_incoming_only() || Config::get_option("client-role") == "agent" {
+        "agent"
+    } else {
+        "console"
+    }
+}
+
+fn collect_local_ips() -> String {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        let mut ips = Vec::new();
+        for iface in default_net::get_interfaces() {
+            for ipv4 in &iface.ipv4 {
+                if !ipv4.addr.is_loopback() && !ipv4.addr.is_link_local() {
+                    let s = ipv4.addr.to_string();
+                    if !ips.contains(&s) {
+                        ips.push(s);
+                    }
+                }
+            }
+        }
+        return ips.join(", ");
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    String::new()
+}
+
+fn get_bound_user_name() -> String {
+    let raw = LocalConfig::get_option("user_info");
+    if raw.is_empty() {
+        return String::new();
+    }
+    serde_json::from_str::<Value>(&raw)
+        .ok()
+        .and_then(|v| v.get("name").and_then(|n| n.as_str()).map(|s| s.to_owned()))
+        .unwrap_or_default()
+}
+
+pub fn report_outgoing_session(
+    peer_id: String,
+    peer_name: String,
+    peer_platform: String,
+    peer_username: String,
+    conn_type: i32,
+    action: &'static str,
+    nonce: String,
+) {
+    let api_server = crate::common::get_api_server(
+        Config::get_option("api-server"),
+        Config::get_option("custom-rendezvous-server"),
+    );
+    if api_server.is_empty() || crate::is_public(&api_server) {
+        return;
+    }
+    let url = format!("{}/api/audit/outgoing", api_server);
+    let my_id = Config::get_id();
+    let uuid = crate::encode64(hbb_common::get_uuid());
+    let local_ips = collect_local_ips();
+    let bound_user = get_bound_user_name();
+    let client_role = current_client_role();
+    let version = crate::VERSION.to_owned();
+    let hostname = crate::hostname();
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let username = crate::platform::get_active_username();
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let username = String::new();
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let os = String::new();
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let os = hbb_common::whoami::platform().to_string();
+
+    tokio::spawn(async move {
+        let body = json!({
+            "id": my_id,
+            "uuid": uuid,
+            "client_role": client_role,
+            "hostname": hostname,
+            "username": username,
+            "bound_user": bound_user,
+            "local_ips": local_ips,
+            "os": os,
+            "version": version,
+            "peer_id": peer_id,
+            "peer_name": peer_name,
+            "peer_platform": peer_platform,
+            "peer_username": peer_username,
+            "conn_type": conn_type,
+            "action": action,
+            "nonce": nonce,
+        })
+        .to_string();
+        if let Err(err) = crate::post_request(url, body, "").await {
+            log::trace!("report_outgoing_session failed: {err:?}");
+        }
+    });
 }
 
 fn heartbeat_url() -> String {

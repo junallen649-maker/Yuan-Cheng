@@ -116,13 +116,13 @@ fn make_tray() -> hbb_common::ResultType<()> {
             // dialog, I found on one user's desktop, but no idea why, Windows is shit.
             // Use `run_me` instead.
             // `allow_multiple_instances` in `flutter/windows/runner/main.cpp` allows only one instance without args.
-            crate::run_me::<&str>(vec![]).ok();
+            crate::run_me(vec!["--show-ui"]).ok();
         }
         #[cfg(target_os = "linux")]
         {
             // Do not use "xdg-open", it won't read the config.
             if crate::dbus::invoke_new_connection(crate::get_uri_prefix()).is_err() {
-                if let Ok(task) = crate::run_me::<&str>(vec![]) {
+                if let Ok(task) = crate::run_me(vec!["--show-ui"]) {
                     crate::server::CHILD_PROCESS.lock().unwrap().push(task);
                 }
             }
