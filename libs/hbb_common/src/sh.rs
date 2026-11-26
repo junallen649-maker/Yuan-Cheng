@@ -13,15 +13,15 @@ use std::process::Command;
 // No idea why the audit logs happen.
 // Though the audit logs may disappear after rebooting.
 //
-// See https://github.com/rustdesk/rustdesk/discussions/11959
+// See https://github.com/polaris/polaris/discussions/11959
 //
-// `ausearch -x /usr/share/rustdesk/rustdesk` will return
+// `ausearch -x /usr/share/polaris/polaris` will return
 // ...
 // time->Tue Jun 24 10:40:43 2025
 // type=PROCTITLE msg=audit(1750776043.446:192757): proctitle=2F7573722F62696E2F727573746465736B002D2D73657276696365
 // type=PATH msg=audit(1750776043.446:192757): item=0 name="/usr/local/bin/sh" nametype=UNKNOWN cap_fp=0 cap_fi=0 cap_fe=0 cap_fver=0 cap_frootid=0
 // type=CWD msg=audit(1750776043.446:192757): cwd="/"
-// type=SYSCALL msg=audit(1750776043.446:192757): arch=c000003e syscall=59 success=no exit=-2 a0=7fb7dbd22da0 a1=1d65f2c0 a2=7ffc25193360 a3=7ffc25194ec0 items=1 ppid=172208 pid=267565 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="rustdesk" exe="/usr/share/rustdesk/rustdesk" subj=unconfined key="processos_criados"
+// type=SYSCALL msg=audit(1750776043.446:192757): arch=c000003e syscall=59 success=no exit=-2 a0=7fb7dbd22da0 a1=1d65f2c0 a2=7ffc25193360 a3=7ffc25194ec0 items=1 ppid=172208 pid=267565 auid=4294967295 uid=0 gid=0 euid=0 suid=0 fsuid=0 egid=0 sgid=0 fsgid=0 tty=(none) ses=4294967295 comm="polaris" exe="/usr/share/polaris/polaris" subj=unconfined key="processos_criados"
 // ----
 // time->Tue Jun 24 10:40:43 2025
 // type=PROCTITLE msg=audit(1750776043.446:192758): proctitle=2F7573722F62696E2F727573746465736B002D2D73657276696365

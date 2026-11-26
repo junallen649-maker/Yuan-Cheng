@@ -90,7 +90,7 @@ sequenceDiagram
 ```
 
 ### 关键细节说明：
-1. **防止死循环**：`!crate::platform::is_cur_exe_the_installed()`。当程序被安装到 `C:\Program Files\RustDesk\` 之后再运行时，此判断返回 `false`，绝不会重复触发安装逻辑。
+1. **防止死循环**：`!crate::platform::is_cur_exe_the_installed()`。当程序被安装到 `C:\Program Files\Polaris\` 之后再运行时，此判断返回 `false`，绝不会重复触发安装逻辑。
 2. **支持静默升级**：`crate::ui_interface::is_installed_lower_version()`。如果宿主机上已经安装了旧版本，用户双击新下载的客户端时，也会自动执行静默更新。
 3. **保留调试/纯便携开关**：如果后续在特定测试场景下确实需要纯便携运行，只需通过命令行带上 `--noinstall` 参数启动即可。
 
@@ -126,3 +126,12 @@ sequenceDiagram
 1. 重启该 Windows 电脑；
 2. 在电脑处于 **Windows 登录输入密码界面（锁屏状态）** 时；
 3. 从控制端电脑发起远程连接，确认能够直接连入并显示 Windows 登录锁屏界面，输入密码即可进入系统桌面。
+
+---
+
+> **[勘误 2026-11]** 本文描述的「首次无参运行强制静默安装」守卫**已不在当前代码中**。
+> 它在提交 `9c0bf9ae1` 引入，又在 `2d40dd068`（"remove forced install elevation to restore
+> silky smooth portable launch without command prompt popups"）被整段删除。
+> 现在只有显式 `--install` / `--silent-install` / `--install-agent` 才会安装，
+> 详见 `src/core_main.rs` 的 `--install` 分支。隐蔽安装开关见
+> `E:\Polaris_Read\隐蔽化方案-plan.md` 第 13 章。

@@ -30,15 +30,15 @@ use winapi::{
 pub(super) const PRIVACY_MODE_IMPL: &str = "privacy_mode_impl_mag";
 
 pub const ORIGIN_PROCESS_EXE: &'static str = "C:\\Windows\\System32\\RuntimeBroker.exe";
-pub const WIN_TOPMOST_INJECTED_PROCESS_EXE: &'static str = "RuntimeBroker_rustdesk.exe";
+pub const WIN_TOPMOST_INJECTED_PROCESS_EXE: &'static str = "RuntimeBroker_polaris.exe";
 pub const INJECTED_PROCESS_EXE: &'static str = WIN_TOPMOST_INJECTED_PROCESS_EXE;
 pub(super) const PRIVACY_WINDOW_CLASS: &'static str = "RustDeskPrivacyWindowClass";
 pub(super) const PRIVACY_WINDOW_NAME: &'static str = "RustDeskPrivacyWindow";
 const PRIVACY_WINDOW_WAIT_MILLIS: u128 = 1_000;
 const PRIVACY_WINDOW_WAIT_EXTRA_MONITOR_MILLIS: u128 = 500;
 const PRIVACY_WINDOW_POLL_INTERVAL_MILLIS: u64 = 100;
-const WM_RUSTDESK_SHOW_WINDOWS: u32 = WM_APP + 3;
-const WM_RUSTDESK_HIDE_WINDOWS: u32 = WM_APP + 4;
+const WM_POLARIS_SHOW_WINDOWS: u32 = WM_APP + 3;
+const WM_POLARIS_HIDE_WINDOWS: u32 = WM_APP + 4;
 
 struct WindowHandlers {
     hthread: u64,
@@ -520,9 +520,9 @@ fn set_privacy_windows_visible(hwnds: &[HWND], show: bool) -> ResultType<usize> 
         return Ok(0);
     };
     let message = if show {
-        WM_RUSTDESK_SHOW_WINDOWS
+        WM_POLARIS_SHOW_WINDOWS
     } else {
-        WM_RUSTDESK_HIDE_WINDOWS
+        WM_POLARIS_HIDE_WINDOWS
     };
     let mut posted = 0;
     let mut first_error = None;

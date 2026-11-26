@@ -1,4 +1,4 @@
-﻿<!--
+<!--
    Copyright (c) Microsoft Corporation.  All rights reserved.
    
    The use and distribution terms for this software are covered by the
@@ -10,7 +10,7 @@
    You must not remove this notice, or any other, from this software.
 -->
 <!--
-Adapted by RustDesk for Custom Dialogs insertions
+Adapted by Polaris for Custom Dialogs insertions
 -->
 <WixLocalization Culture="en-us"
 	xmlns="http://wixtoolset.org/schemas/v4/wxl">

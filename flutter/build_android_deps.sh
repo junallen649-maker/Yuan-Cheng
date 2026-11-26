@@ -4,7 +4,7 @@ set -e -o pipefail
 
 ANDROID_ABI=$1
 
-# Build RustDesk dependencies for Android using vcpkg.json
+# Build Polaris dependencies for Android using vcpkg.json
 # Required:
 #   1. set VCPKG_ROOT / ANDROID_NDK_HOME path environment variables
 #   2. vcpkg initialized
@@ -47,7 +47,7 @@ SCRIPTDIR="$(dirname "${SCRIPTDIR}")"
 # Check if vcpkg.json is one level up - in root directory of RD
 
 if [ ! -f "${SCRIPTDIR}/../vcpkg.json" ]; then
-	echo "ERROR: Can not find vcpkg.json in RustDesk top-level directory" 1>&2
+	echo "ERROR: Can not find vcpkg.json in Polaris top-level directory" 1>&2
 	exit 1
 fi
 

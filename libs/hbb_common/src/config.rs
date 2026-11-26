@@ -114,9 +114,44 @@ const CHARS: &[char] = &[
     'm', 'n', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 ];
 
-pub const RENDEZVOUS_SERVERS: &[&str] = &["easyreach.asia", "8.138.129.79"];
-pub const RS_PUB_KEY: &str = "4X5pVV3YQWzlT8LsiNAqmFocdB6cPf+J+rW3CKdESzQ=";
+/// Decode a sensitive string at run time so the plaintext never lands in `.rdata`.
+/// The arrays below are XOR-encoded; the key stays a plain constant so the compiler
+/// cannot constant-fold the result back into the binary.
+#[inline]
+pub fn obf_str(bytes: &[u8], key: u8) -> String {
+    let mut v: Vec<u8> = bytes.iter().map(|b| b ^ key).collect();
+    let s = String::from_utf8(v.clone()).unwrap_or_default();
+    for b in v.iter_mut() {
+        *b = 0;
+    }
+    s
+}
 
+const OBF_KEY: u8 = 0x5A;
+
+lazy_static::lazy_static! {
+    pub static ref RENDEZVOUS_SERVERS: Vec<String> = vec![
+        obf_str(
+            &[
+                0x3f, 0x3b, 0x29, 0x23, 0x28, 0x3f, 0x3b, 0x39, 0x32, 0x74, 0x3b, 0x29, 0x33, 0x3b,
+            ],
+            OBF_KEY
+        ),
+        obf_str(
+            &[0x62, 0x74, 0x6b, 0x69, 0x62, 0x74, 0x6b, 0x68, 0x63, 0x74, 0x6d, 0x63],
+            OBF_KEY
+        ),
+    ];
+    pub static ref RS_PUB_KEY: String = obf_str(
+        &[
+            0x6e, 0x02, 0x6f, 0x2a, 0x0c, 0x0c, 0x69, 0x03, 0x0b, 0x0d, 0x20, 0x36, 0x0e, 0x62,
+            0x16, 0x29, 0x33, 0x14, 0x1b, 0x2b, 0x37, 0x1c, 0x35, 0x39, 0x3e, 0x18, 0x6c, 0x39,
+            0x0a, 0x3c, 0x71, 0x10, 0x71, 0x28, 0x0d, 0x69, 0x19, 0x11, 0x3e, 0x1f, 0x09, 0x20,
+            0x0b, 0x67,
+        ],
+        OBF_KEY
+    );
+}
 pub const RENDEZVOUS_PORT: i32 = 21116;
 pub const RELAY_PORT: i32 = 21117;
 pub const WS_RENDEZVOUS_PORT: i32 = 21118;

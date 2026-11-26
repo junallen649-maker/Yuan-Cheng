@@ -26,7 +26,7 @@ typedef F3Dart = Pointer<Uint8> Function(Pointer<Utf8>, Int32);
 typedef HandleEvent = Future<void> Function(Map<String, dynamic> evt);
 
 DynamicLibrary _openLinuxCoreLib() {
-  for (final name in ['libpolaris.so', 'librustdesk.so']) {
+  for (final name in ['libpolaris.so']) {
     final bundled =
         '${File(Platform.resolvedExecutable).parent.path}/lib/$name';
     try {
@@ -37,11 +37,7 @@ DynamicLibrary _openLinuxCoreLib() {
       debugPrint("Failed to load '$bundled': $e");
     }
   }
-  try {
-    return DynamicLibrary.open('libpolaris.so');
-  } catch (_) {
-    return DynamicLibrary.open('librustdesk.so');
-  }
+  return DynamicLibrary.open('libpolaris.so');
 }
 
 /// FFI wrapper around the native Rust core.
@@ -51,7 +47,7 @@ class PlatformFFI {
   // _homeDir is only needed for Android and IOS.
   String _homeDir = '';
   final _eventHandlers = <String, Map<String, HandleEvent>>{};
-  late RustdeskImpl _ffiBind;
+  late PolarisImpl _ffiBind;
   late String _appType;
   StreamEventHandler? _eventCallback;
 
@@ -60,7 +56,7 @@ class PlatformFFI {
   static final PlatformFFI instance = PlatformFFI._();
   final _toAndroidChannel = const MethodChannel('mChannel');
 
-  RustdeskImpl get ffiBind => _ffiBind;
+  PolarisImpl get ffiBind => _ffiBind;
   F3? _session_get_rgba;
 
   static get localeName => Platform.localeName;
@@ -137,30 +133,14 @@ class PlatformFFI {
   Future<void> init(String appType) async {
     _appType = appType;
     final dylib = isAndroid
-        ? () {
-            try {
-              return DynamicLibrary.open('libpolaris.so');
-            } catch (_) {
-              return DynamicLibrary.open('librustdesk.so');
-            }
-          }()
-        : isLinux
-            ? _openLinuxCoreLib()
-            : isWindows
-                ? () {
-                    try {
-                      return DynamicLibrary.open('libpolaris.dll');
-                    } catch (_) {
-                      return DynamicLibrary.open('librustdesk.dll');
-                    }
-                  }()
-                :
-                // Use executable itself as the dynamic library for MacOS.
-                // Multiple dylib instances will cause some global instances to be invalid.
-                // eg. `lazy_static` objects in rust side, will be created more than once, which is not expected.
-                //
-                // isMacOS? DynamicLibrary.open("libpolaris.dylib") :
-                DynamicLibrary.process();
+        ? DynamicLibrary.open('libpolaris.so')
+        : isWindows
+            ? DynamicLibrary.open('polaris.dll')
+            :
+            // Use the executable itself as the dynamic library on macOS. Multiple
+            // dylib instances would duplicate Rust globals such as `lazy_static`.
+            // isMacOS ? DynamicLibrary.open('libpolaris.dylib') :
+            DynamicLibrary.process();
     debugPrint('initializing FFI $_appType');
     try {
       _session_get_rgba = dylib.lookupFunction<F3Dart, F3>("session_get_rgba");
@@ -170,7 +150,7 @@ class PlatformFFI {
       } catch (e) {
         debugPrint('Failed to get documents directory: $e');
       }
-      _ffiBind = RustdeskImpl(dylib);
+      _ffiBind = PolarisImpl(dylib);
 
       if (isLinux) {
         if (isMain) {
@@ -272,10 +252,10 @@ class PlatformFFI {
   }
 
   /// Start listening to the Rust core's events and frames.
-  void _startListenEvent(RustdeskImpl rustdeskImpl) {
+  void _startListenEvent(PolarisImpl polarisImpl) {
     final appType =
         _appType == kAppTypeDesktopRemote ? '$_appType,$kWindowId' : _appType;
-    var sink = rustdeskImpl.startGlobalEventStream(appType: appType);
+    var sink = polarisImpl.startGlobalEventStream(appType: appType);
     sink.listen((message) {
       () async {
         try {

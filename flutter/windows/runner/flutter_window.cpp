@@ -62,7 +62,7 @@ constexpr UINT kForceRedrawCheapTries = 2;
 // Re-enters the embedder's OnWindowSizeChanged by nudging the Flutter child
 // window by 1px and back: this resets the resize target and resends the window
 // metrics. Same as BaseFlutterWindow::ForceChildRefresh() on the
-// rustdesk_desktop_multi_window side.
+// polaris_desktop_multi_window side.
 void ForceChildRefresh(HWND child) {
   if (!child) {
     return;
@@ -208,7 +208,7 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
           // one or under a debugger (see main.cpp), and this fires on end-user
           // machines. OutputDebugString is readable with DebugView there.
           OutputDebugStringA(
-              "rustdesk: Flutter window did not render its first frame, "
+              "polaris: Flutter window did not render its first frame, "
               "giving up.\n");
           KillTimer(hwnd, kForceRedrawTimerId);
         } else if (force_redraw_tries_ <= kForceRedrawCheapTries) {

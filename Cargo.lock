@@ -7086,7 +7086,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustdesk"
+name = "polaris"
 version = "1.5.0"
 dependencies = [
  "android-wakelock",
@@ -7201,7 +7201,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rustdesk-portable-packer"
+name = "polaris-portable-packer"
 version = "1.5.0"
 dependencies = [
  "brotli",

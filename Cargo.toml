@@ -1,15 +1,15 @@
 [package]
-name = "rustdesk"
+name = "polaris"
 version = "1.5.0"
 authors = ["Polaris <support@polaris.com>"]
 edition = "2021"
 build= "build.rs"
 description = "Polaris Remote Desktop"
-default-run = "rustdesk"
+default-run = "polaris"
 rust-version = "1.75"
 
 [lib]
-name = "librustdesk"
+name = "polaris"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [[bin]]

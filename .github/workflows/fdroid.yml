@@ -14,10 +14,10 @@ jobs:
   # Finds latest release and transforms F-Droid version code from version as follows:
   # X.Y.Z-A => X * 1e6 + Y * 1e4 + Z * 1e2 + A
   update-fdroid-version-file:
-    name: Publish RustDesk version file for F-Droid updater
+    name: Publish Polaris version file for F-Droid updater
     runs-on: ubuntu-latest
     steps:
-      - name: Generate RustDesk version file
+      - name: Generate Polaris version file
         run: |
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             UPSTREAM_VERNAME="${GITHUB_REF##refs/tags/}"
@@ -26,14 +26,14 @@ jobs:
             UPSTREAM_VERNAME="$(curl https://api.github.com/repos/rustdesk/rustdesk/releases/latest  | jq -r .tag_name | sed 's/^v//')"
           fi
           UPSTREAM_VERCODE="$(echo "$UPSTREAM_VERNAME" | tr '.' ' ' | tr '-' ' ' | while read -r MAJOR MINOR PATCH REV; do [ -z "$MAJOR" ] && MAJOR=0; [ -z "$MINOR" ] && MINOR=0; [ -z "$PATCH" ] && PATCH=0; [ -z "$REV" ] && REV=0; echo "$(( 1000000 * $MAJOR + 10000 * $MINOR + 100 * $PATCH + $REV ))"; done)"
-          echo "versionName=$UPSTREAM_VERNAME"  > rustdesk-version.txt
-          echo "versionCode=$UPSTREAM_VERCODE" >> rustdesk-version.txt
+          echo "versionName=$UPSTREAM_VERNAME"  > polaris-version.txt
+          echo "versionCode=$UPSTREAM_VERCODE" >> polaris-version.txt
         shell: bash
 
-      - name: Publish RustDesk version file
+      - name: Publish Polaris version file
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
         with:
           prerelease: true
           tag_name: "fdroid-version"
           files: |
-            ./rustdesk-version.txt
+            ./polaris-version.txt

@@ -13,9 +13,7 @@ bool _loadRequested = false;
 /// registered under the family name google_fonts gives the terminal's
 /// TextStyle ('RobotoMono_regular').
 Future<void> loadLocalTerminalFontIfNeeded() async {
-  if (_loadRequested ||
-      (js.context['polarisLocalFonts'] != true &&
-          js.context['rustdeskLocalFonts'] != true)) {
+  if (_loadRequested || js.context['polarisLocalFonts'] != true) {
     return;
   }
   _loadRequested = true;

@@ -75,7 +75,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
         ? InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: () async {
-              await rustDeskWinManager.closeAllSubWindows();
+              await polarisWinManager.closeAllSubWindows();
               bind.mainGotoInstall();
             },
             child: Container(

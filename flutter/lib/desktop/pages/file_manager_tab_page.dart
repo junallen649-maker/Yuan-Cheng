@@ -65,7 +65,7 @@ class _FileManagerTabPageState extends State<FileManagerTabPage> {
   void initState() {
     super.initState();
 
-    rustDeskWinManager.setMethodHandler((call, fromWindowId) async {
+    polarisWinManager.setMethodHandler((call, fromWindowId) async {
       debugPrint(
           "[FileTransfer] call ${call.method} with args ${call.arguments} from window $fromWindowId to ${windowId()}");
       // for simplify, just replace connectionId

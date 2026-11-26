@@ -53,7 +53,7 @@ fn to_absolute(v: i32, origin: i32, extent: i32) -> Option<i32> {
 fn keybd_event(mut flags: u32, vk: u16, scan: u16) -> DWORD {
     let mut scan = scan;
     unsafe {
-        // https://github.com/rustdesk/rustdesk/issues/366
+        // https://github.com/polaris/polaris/issues/366
         if scan == 0 {
             if LAYOUT.is_null() {
                 let current_window_thread_id =
@@ -276,7 +276,7 @@ impl KeyboardControllable for Enigo {
         match &key {
             Key::Layout(c) => {
                 // to-do: dup code
-                // https://github.com/rustdesk/rustdesk/blob/1bc0dd791ed8344997024dc46626bd2ca7df73d2/src/server/input_service.rs#L1348
+                // https://github.com/polaris/polaris/blob/1bc0dd791ed8344997024dc46626bd2ca7df73d2/src/server/input_service.rs#L1348
                 let code = self.get_layoutdependent_keycode(*c);
                 if code as u16 != 0xFFFF {
                     let vk = code & 0x00FF;

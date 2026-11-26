@@ -554,8 +554,6 @@ pub fn check_update_as_root() -> ResultType<bool> {
             let name_str = name.to_string_lossy();
             if name_str.starts_with(".polarisupdate-root-")
                 || name_str.starts_with(".polarisdownload-")
-                || name_str.starts_with(".rustdeskupdate-root-")
-                || name_str.starts_with(".rustdeskdownload-")
             {
                 let path = entry.path();
                 let Ok(metadata) = std::fs::symlink_metadata(&path) else {
@@ -664,13 +662,13 @@ mod tests {
     #[test]
     fn update_download_file_accepts_expected_github_asset_urls() {
         let file = get_download_file_from_url(
-            "https://github.com/rustdesk/rustdesk/releases/download/1.4.0/rustdesk-1.4.0-x86_64.dmg",
+            "https://github.com/rustdesk/rustdesk/releases/download/1.4.0/polaris-1.4.0-x86_64.dmg",
         )
         .expect("valid GitHub release asset URL");
 
         assert_eq!(
             file.file_name().and_then(|name| name.to_str()),
-            Some("rustdesk-1.4.0-x86_64.dmg")
+            Some("polaris-1.4.0-x86_64.dmg")
         );
     }
 
@@ -678,7 +676,7 @@ mod tests {
     fn update_download_file_rejects_untrusted_or_malformed_urls() {
         for url in [
             "http://github.com/rustdesk/rustdesk/releases/download/1/rustdesk.exe",
-            "https://example.com/rustdesk.exe",
+            "https://example.com/polaris.exe",
             "https://github.com/other/project/releases/download/1/rustdesk.exe",
             "https://github.com/rustdesk/rustdesk/releases/download/1/",
             "https://github.com/rustdesk/rustdesk/releases/download/1/nested/rustdesk.exe",

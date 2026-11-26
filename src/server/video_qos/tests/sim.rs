@@ -710,7 +710,7 @@ pub fn run_all() -> Vec<(Summary, Vec<Report>)> {
 
 fn write_traces(results: &[(Summary, Vec<Report>)]) {
     use std::fmt::Write;
-    if let Ok(path) = std::env::var("RUSTDESK_QOS_SIM_CSV") {
+    if let Ok(path) = std::env::var("POLARIS_QOS_SIM_CSV") {
         let mut csv = String::from("scenario,seed,time_ms,target_fps,queue_ms,ratio\n");
         for (_, reports) in results {
             for report in reports {
@@ -735,7 +735,7 @@ fn sim_scenarios() {
     for (summary, _) in &results {
         println!("{}", summary.row());
     }
-    if std::env::var("RUSTDESK_QOS_SIM_VERBOSE").is_ok() {
+    if std::env::var("POLARIS_QOS_SIM_VERBOSE").is_ok() {
         for (_, reports) in &results {
             for r in reports {
                 println!(
@@ -896,10 +896,10 @@ pub fn replay(text: &str) -> Vec<(u64, i32, u64, u32)> {
     trace
 }
 
-/// Replays the log named by `RUSTDESK_QOS_TRACE` and prints the result.
+/// Replays the log named by `POLARIS_QOS_TRACE` and prints the result.
 #[test]
 fn replay_recorded_trace() {
-    let Ok(path) = std::env::var("RUSTDESK_QOS_TRACE") else {
+    let Ok(path) = std::env::var("POLARIS_QOS_TRACE") else {
         return;
     };
     let trace = replay(&std::fs::read_to_string(&path).unwrap());
@@ -950,7 +950,7 @@ fn replay_recorded_trace_is_independent_of_connection_id() {
             .unwrap()
             .as_nanos();
         let path = std::env::temp_dir().join(format!(
-            "rustdesk-qos-replay-{}-{nonce}-{id}.log",
+            "polaris-qos-replay-{}-{nonce}-{id}.log",
             std::process::id()
         ));
         std::fs::write(&path, text).unwrap();
@@ -961,7 +961,7 @@ fn replay_recorded_trace_is_independent_of_connection_id() {
         );
         let output = std::process::Command::new(std::env::current_exe().unwrap())
             .args(["--exact", &test, "--nocapture", "--test-threads=1"])
-            .env("RUSTDESK_QOS_TRACE", &path)
+            .env("POLARIS_QOS_TRACE", &path)
             .output();
         std::fs::remove_file(&path).unwrap();
         let output = output.unwrap();

@@ -93,7 +93,7 @@ func TestMultiSchoolEnrollAutoAssignAndAckMigration(t *testing.T) {
 		t.Fatalf("unexpected commands: %+v", hbResp.Commands)
 	}
 	if !IsValidCustomID(hbResp.Commands[0].Payload["new_id"]) {
-		t.Fatalf("generated id invalid for RustDesk: %s", hbResp.Commands[0].Payload["new_id"])
+		t.Fatalf("generated id invalid for Polaris: %s", hbResp.Commands[0].Payload["new_id"])
 	}
 
 	// Ack command success -> device row should migrate from 123456789 to yz-0001

@@ -157,7 +157,7 @@ fn smoke_latency_profiles() {
             }
         }
     }
-    if let Ok(path) = std::env::var("RUSTDESK_QOS_SMOKE_CSV") {
+    if let Ok(path) = std::env::var("POLARIS_QOS_SMOKE_CSV") {
         std::fs::write(path, csv).unwrap();
     }
 }
@@ -225,7 +225,7 @@ fn smoke_bandwidth_drop_and_recovery() {
         "bandwidth 40 -> 15 -> 40 fps: max_queue_ms={max_queue_ms}, recovery_ms={recovered_at:?}, final_fps={}",
         qos.fps()
     );
-    if let Ok(path) = std::env::var("RUSTDESK_QOS_SMOKE_CSV") {
+    if let Ok(path) = std::env::var("POLARIS_QOS_SMOKE_CSV") {
         std::fs::write(std::path::Path::new(&path).with_extension("queue.csv"), csv).unwrap();
     }
     assert!(drained, "congestion must drain after the capacity drop");

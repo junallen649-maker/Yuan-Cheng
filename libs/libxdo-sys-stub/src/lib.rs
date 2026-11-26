@@ -103,7 +103,7 @@ struct XdoLib {
 
 impl XdoLib {
     fn load() -> Option<Self> {
-        // https://github.com/rustdesk/rustdesk/issues/13711
+        // https://github.com/polaris/polaris/issues/13711
         const LIB_NAMES: [&str; 3] = ["libxdo.so.4", "libxdo.so.3", "libxdo.so"];
 
         unsafe {

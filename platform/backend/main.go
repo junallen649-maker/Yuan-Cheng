@@ -36,7 +36,7 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"ok": true, "service": "polaris-platform"})
 	})
 
-	// RustDesk / Polaris Client API
+	// Polaris Client API
 	api := r.Group("/api")
 	{
 		api.POST("/sysinfo", h.HandleSysinfo)

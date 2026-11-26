@@ -331,7 +331,7 @@ pub mod client {
             stream: PwStreamInfo,
             resolution: (usize, usize),
         ) -> ResultType<Self> {
-            // https://github.com/rustdesk/rustdesk/pull/9019#issuecomment-2295252388
+            // https://github.com/polaris/polaris/pull/9019#issuecomment-2295252388
             // There may be a bug in Rdp input on Gnome util Ubuntu 24.04 (Gnome 46)
             //
             // eg. Resolution 800x600, Fractional scale: 200% (logic size: 400x300)

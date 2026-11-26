@@ -1577,7 +1577,7 @@ mod tests {
             id,
             JobType::Generic,
             "/fake/remote".to_string(),
-            DataSource::FilePath(std::env::temp_dir().join(format!("rustdesk_validation_{id}"))),
+            DataSource::FilePath(std::env::temp_dir().join(format!("polaris_validation_{id}"))),
             0,
             false,
             true,
@@ -1611,7 +1611,7 @@ mod tests {
 
     #[test]
     fn path_traversal_e2e_write_rejects_relative_escape() {
-        let tmp_root = TestTempDir::new("rustdesk_e2e_relative");
+        let tmp_root = TestTempDir::new("polaris_e2e_relative");
         let downloads = tmp_root.join("downloads");
         std::fs::create_dir_all(&downloads).expect("create downloads dir");
 
@@ -1623,7 +1623,7 @@ mod tests {
 
     #[test]
     fn path_traversal_e2e_write_rejects_absolute_path() {
-        let tmp_root = TestTempDir::new("rustdesk_e2e_absolute");
+        let tmp_root = TestTempDir::new("polaris_e2e_absolute");
         let downloads = tmp_root.join("downloads");
         let absolute_target = tmp_root.join("fake_ssh").join("authorized_keys");
         std::fs::create_dir_all(&downloads).expect("create downloads dir");
@@ -1637,7 +1637,7 @@ mod tests {
     #[test]
     #[cfg_attr(windows, ignore = "requires symlink privilege to create test symlink")]
     fn path_traversal_e2e_write_rejects_symlink_escape() {
-        let tmp_root = TestTempDir::new("rustdesk_e2e_symlink");
+        let tmp_root = TestTempDir::new("polaris_e2e_symlink");
         let downloads = tmp_root.join("downloads");
         let outside = tmp_root.join("outside");
         let escaped_target = outside.join("escape.txt");
@@ -1743,7 +1743,7 @@ mod tests {
 
     #[test]
     fn rename_file_rejects_invalid_new_name() {
-        let tmp_root = TestTempDir::new("rustdesk_rename_invalid");
+        let tmp_root = TestTempDir::new("polaris_rename_invalid");
         let src = tmp_root.join("source.txt");
         std::fs::create_dir_all(&tmp_root.path).expect("create temp dir");
         std::fs::write(&src, b"content").expect("create source file");
@@ -1778,7 +1778,7 @@ mod tests {
 
     #[test]
     fn rename_file_accepts_valid_new_name() {
-        let tmp_root = TestTempDir::new("rustdesk_rename_ok");
+        let tmp_root = TestTempDir::new("polaris_rename_ok");
         let src = tmp_root.join("rename_src.txt");
         let dst = tmp_root.join("renamed.txt");
         std::fs::create_dir_all(&tmp_root.path).expect("create temp dir");

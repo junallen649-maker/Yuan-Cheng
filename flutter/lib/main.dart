@@ -192,7 +192,7 @@ void runMainApp(bool startService) async {
     await windowManager.setOpacity(1.0);
     await windowManager.show();
     await windowManager.focus();
-    rustDeskWinManager.registerActiveWindow(kWindowMainId);
+    polarisWinManager.registerActiveWindow(kWindowMainId);
   }
   await windowManager.setTitle(getWindowName());
   if (!bind.isIncomingOnly()) {

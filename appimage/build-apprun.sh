@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # AppRun v2.0.0, which appimage-builder downloads, splits every argument into a 1 KiB stack
-# buffer, so any argument of 1024 bytes or more aborts the AppImage before RustDesk starts.
+# buffer, so any argument of 1024 bytes or more aborts the AppImage before Polaris starts.
 # Build it with apprun-split-arguments.patch into the path appimage-builder checks before
 # downloading. ubuntu:16.04 is what upstream released from, so the host glibc floor is unchanged.
 set -euo pipefail

@@ -495,7 +495,7 @@ impl<T: InvokeUiCM> IpcTaskRunner<T> {
         let mut write_jobs: Vec<fs::TransferJob> = Vec::new();
         // File timer for processing read_jobs
         let mut file_timer =
-            crate::rustdesk_interval(time::interval_at(Instant::now() + SEC30, SEC30));
+            crate::polaris_interval(time::interval_at(Instant::now() + SEC30, SEC30));
 
         #[cfg(target_os = "windows")]
         let is_authorized = self.cm.is_authorized(self.conn_id);
@@ -617,7 +617,7 @@ impl<T: InvokeUiCM> IpcTaskRunner<T> {
                                     // This ensures new jobs start processing without waiting for the slow 30s timer.
                                     // Deactivation (back to 30s) happens in tick handler when jobs are exhausted.
                                     if !self.read_jobs.is_empty() {
-                                        file_timer = crate::rustdesk_interval(time::interval(MILLI5));
+                                        file_timer = crate::polaris_interval(time::interval(MILLI5));
                                     }
                                     let log = fs::serialize_transfer_jobs(&write_jobs);
                                     self.cm.ui_handler.file_transfer_log("transfer", &log);
@@ -805,7 +805,7 @@ impl<T: InvokeUiCM> IpcTaskRunner<T> {
                         let log = fs::serialize_transfer_jobs(&self.read_jobs);
                         self.cm.ui_handler.file_transfer_log("transfer", &log);
                     } else {
-                        file_timer = crate::rustdesk_interval(time::interval_at(Instant::now() + SEC30, SEC30));
+                        file_timer = crate::polaris_interval(time::interval_at(Instant::now() + SEC30, SEC30));
                     }
                 }
             }
@@ -1789,7 +1789,7 @@ mod tests {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             let (tx, mut rx) = unbounded_channel();
-            let dir = std::env::temp_dir().join("rustdesk_read_all_test");
+            let dir = std::env::temp_dir().join("polaris_read_all_test");
             let _ = fs::remove_dir_all(&dir);
             fs::create_dir_all(&dir).unwrap();
             fs::write(dir.join("test.txt"), b"hello").unwrap();
@@ -1815,7 +1815,7 @@ mod tests {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
             let (tx, mut rx) = unbounded_channel();
-            let dir = std::env::temp_dir().join("rustdesk_read_dir_test");
+            let dir = std::env::temp_dir().join("polaris_read_dir_test");
             let _ = fs::remove_dir_all(&dir);
             fs::create_dir_all(&dir).unwrap();
 
@@ -1829,7 +1829,7 @@ mod tests {
                         .file_response()
                         .dir()
                         .path
-                        .contains("rustdesk_read_dir_test"));
+                        .contains("polaris_read_dir_test"));
                 }
                 _ => panic!("unexpected data"),
             }
@@ -1854,7 +1854,7 @@ mod tests {
     #[test]
     #[cfg(not(any(target_os = "ios")))]
     fn test_symlink_creation_works() {
-        let base_dir = std::env::temp_dir().join("rustdesk_symlink_test");
+        let base_dir = std::env::temp_dir().join("polaris_symlink_test");
         let _ = fs::remove_dir_all(&base_dir);
         fs::create_dir_all(&base_dir).unwrap();
 

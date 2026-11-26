@@ -123,7 +123,7 @@ fn unrotate_hotspot(transform: i32, w: i32, h: i32, hotx: i32, hoty: i32) -> (i3
 
 /// Turn a 4-byte-pixel frame upright into tightly packed `dst`, undoing `transform` degrees;
 /// padded `src` rows ok (stride = len/h). Direction pinned by the tests to the measured anchor
-/// of rustdesk#15886; libyuv walks pixels, so channel order does not matter.
+/// of polaris#15886; libyuv walks pixels, so channel order does not matter.
 fn unrotate_bgra(src: &[u8], w: usize, h: usize, transform: i32, dst: &mut Vec<u8>) {
     const PX: usize = 4;
     let stride = if h > 0 { src.len() / h } else { 0 };
@@ -1359,7 +1359,7 @@ fn remove_drm_cursor(display: i32, epoch: u64) {
 /// Unrotate a wire cursor into the session orientation and publish it. The compositor
 /// pre-rotates the bitmap it programs into the cursor plane, so over the unrotated video the
 /// cursor alone would stay turned and its hotspot transposed (review finding 11 on
-/// rustdesk#15889). The wire id hashes only the plane pixels and geometry, so a stream rebuilt
+/// polaris#15889). The wire id hashes only the plane pixels and geometry, so a stream rebuilt
 /// under a new transform resends the SAME id and the client's by-id cursor cache would keep the
 /// old orientation: fold the transform in (the producer's own FNV step) so id and orientation
 /// can never disagree. The hidden sentinel must survive untouched.
@@ -2416,7 +2416,7 @@ mod drm_capturer_tests {
 
     #[test]
     fn unrotate_90_maps_the_left_column_to_the_top_row() {
-        // The measured anchor from rustdesk#15886: mutter transform=1 carries the panel bar down
+        // The measured anchor from polaris#15886: mutter transform=1 carries the panel bar down
         // the scanout's LEFT edge, and upright means that edge becomes the TOP row.
         let (src, w, h) = px_frame(&[&[1, 2, 3], &[4, 5, 6]], 0);
         let mut dst = Vec::new();
@@ -2509,7 +2509,7 @@ mod drm_capturer_tests {
         (out, dw, dh)
     }
 
-    // rustdesk#15886, the maintainer's physical test: the cursor looked right at 0 and 90, drawn
+    // polaris#15886, the maintainer's physical test: the cursor looked right at 0 and 90, drawn
     // above the click point at 270, and upside down at 180. Two causes, not one. The sprite came
     // out upside down at 180 because master turned it only at 90 and 270, so a 180 sprite was
     // never turned back at all. And at every angle the hotspot was GUESSED on the sprite as
@@ -2549,7 +2549,7 @@ mod drm_capturer_tests {
         assert_eq!(old_wrong_at, vec![90, 180, 270]);
     }
 
-    // rustdesk#16242, the maintainer's pixel-level finding: the guess only centred TALL shapes, so
+    // polaris#16242, the maintainer's pixel-level finding: the guess only centred TALL shapes, so
     // a horizontal I-beam got the corner of its box. Before the rotation rework such a cursor
     // reached a quarter-turned output as a tall bitmap and the same rule centred it by accident, so
     // turning the sprite upright first - correct in itself - turned a nearly right hotspot into one
@@ -3106,7 +3106,7 @@ mod drm_capturer_tests {
         forget_cursor_cal(shape, CAL_GEN);
     }
 
-    // Review of rustdesk#16122 (pre-push, 23-sep): a served correction 3 px from the wire and a
+    // Review of polaris#16122 (pre-push, 23-sep): a served correction 3 px from the wire and a
     // confirmed value in band with BOTH. The served value wins, or every confirmation in that
     // band would flap the hotspot and the id. A value in band with the wire only still goes
     // back to the wire. Mutation caught: comparing the wire before the served value.
@@ -3145,7 +3145,7 @@ mod drm_capturer_tests {
         assert_eq!(c.candidate, Some(((12, 12), 4, 0)));
     }
 
-    // The local hand on the mouse (review of rustdesk#16122): the remote peer stops, a local user
+    // The local hand on the mouse (review of polaris#16122): the remote peer stops, a local user
     // nudges the pointer, the plane settles somewhere new, and the only sample on hand is the
     // stale remote one. However many times the plane settles, the same sample never confirms.
     #[test]
@@ -3874,7 +3874,7 @@ mod drm_capturer_tests {
     }
 
     // ---------------------------------------------------------------------------------------
-    // rustdesk#16242 round 2: the measurement behind the inference model.
+    // polaris#16242 round 2: the measurement behind the inference model.
     //
     // The question a synthetic fixture cannot answer: when the driver publishes no hotspot and
     // the sprite has to be turned upright before guessing, how far from the THEME's real click
@@ -3997,7 +3997,7 @@ mod drm_capturer_tests {
     }
 
     // -----------------------------------------------------------------------------------------
-    // rustdesk#16242 round 2: the guess measured against the hotspots a THEME declares.
+    // polaris#16242 round 2: the guess measured against the hotspots a THEME declares.
     //
     // Every test above builds its own sprite, so all of them compare the guess with the guess.
     // That can pin a mapping but it cannot say whether the guess is any good. These two read the

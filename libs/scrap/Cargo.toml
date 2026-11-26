@@ -11,7 +11,7 @@ edition = "2018"
 
 [features]
 wayland = ["gstreamer", "gstreamer-app", "gstreamer-video", "dbus", "tracing", "zbus"]
-# `drm` is a pure runtime-dlopen backend: rustdesk loads `libdrmtap.so.0` at runtime (`drmtap_dl.rs`)
+# `drm` is a pure runtime-dlopen backend: Polaris loads `libdrmtap.so.0` at runtime (`drmtap_dl.rs`)
 # and NEVER link-time links it, so the graceful PipeWire fallback when the .so or EGL is absent is
 # preserved and the drm build pulls in no libdrm/seccomp/cap/EGL link-time deps. The .so is pinned by
 # `DRMTAP_SHA` in build.py, which fetches that exact commit (libdrmtap v0.5.6). We deliberately do

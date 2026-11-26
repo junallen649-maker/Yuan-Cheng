@@ -6,7 +6,7 @@
 #include "my_application.h"
 
 #define POLARIS_LIB_PATH "libpolaris.so"
-#define RUSTDESK_LIB_PATH "librustdesk.so"
+#define RUSTDESK_LIB_PATH "libpolaris.so"
 typedef bool (*CoreMainFunc)();
 bool gIsConnectionManager = false;
 

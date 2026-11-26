@@ -1384,8 +1384,8 @@ impl TerminalServiceProxy {
 
         // Generate unique pipe names for this terminal
         let pipe_id = uuid::Uuid::new_v4();
-        let input_pipe_name = format!(r"\\.\pipe\rustdesk_term_in_{}", pipe_id);
-        let output_pipe_name = format!(r"\\.\pipe\rustdesk_term_out_{}", pipe_id);
+        let input_pipe_name = format!(r"\\.\pipe\polaris_term_in_{}", pipe_id);
+        let output_pipe_name = format!(r"\\.\pipe\polaris_term_out_{}", pipe_id);
 
         log::debug!(
             "Creating pipes: input={}, output={}",

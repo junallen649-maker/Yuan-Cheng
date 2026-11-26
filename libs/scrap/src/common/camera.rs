@@ -55,7 +55,7 @@ impl Cameras {
                         // But maybe we also need to check index (1) or the lowest index camera.
                         //
                         // https://askubuntu.com/questions/234362/how-to-fix-this-problem-where-sometimes-dev-video0-becomes-automatically-dev
-                        // https://github.com/rustdesk/rustdesk/pull/12010#issue-3125329069
+                        // https://github.com/polaris/polaris/pull/12010#issue-3125329069
                         let mut camera_index = info.index().clone();
                         if !matches!(camera_index, CameraIndex::Index(0)) {
                             if cameras.iter().any(|cam| matches!(cam.index(), CameraIndex::Index(0))) {

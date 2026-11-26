@@ -140,7 +140,7 @@ const WAYLAND_PIPEWIRE_HANDOVER: &str = "Screen sharing was approved on the remo
 const WAYLAND_ENDED: &str =
     "The screen sharing request ended without completing on the remote device";
 // The remedy the message it replaces used to carry, minus the link: this is the outcome
-// rustdesk/rustdesk#8600 is about.
+// polaris/polaris#8600 is about.
 const WAYLAND_NO_USABLE_SCREEN: &str = "RustDesk could not obtain a usable screen from the XDG Desktop Portal, the PipeWire library may be too old";
 const WAYLAND_GST_UNAVAILABLE: &str =
     "RustDesk could not load a GStreamer component needed for screen capture ({})";
@@ -259,7 +259,7 @@ mod tests {
         let gst = staged_message("gst-plugin:unavailable:pipewiresrc", false);
         assert_eq!(
             gst,
-            "RustDesk could not load a GStreamer component needed for screen capture ({pipewiresrc})"
+            "Polaris could not load a GStreamer component needed for screen capture ({pipewiresrc})"
         );
         let open = gst.find('{').expect("no placeholder");
         let close = gst[open..].find('}').expect("unclosed placeholder") + open;
@@ -347,7 +347,7 @@ fn drm_desktop_rect_for_uinput() -> Option<(i32, i32, i32, i32)> {
 /// same three things, for the same reasons:
 ///
 /// - drops the cached Wayland layout first, because it can predate compositor changes made while no
-///   session was active (rustdesk#15601), and on the hotplug path it is stale by definition;
+///   session was active (polaris#15601), and on the hotplug path it is stale by definition;
 /// - bounds the IPC wait, because `uinput::client::set_resolution` reads its reply with no timeout of
 ///   its own, so a hung uinput socket would otherwise block every video-service start on this branch
 ///   and wedge the hotplug worker inside `rt.block_on`, leaving `UINPUT_REFRESH_BUSY` latched true so
@@ -476,7 +476,7 @@ pub(super) async fn check_init() -> ResultType<()> {
         if CAP_DISPLAY_INFO.read().unwrap().is_empty() {
             if crate::input_service::wayland_use_uinput() {
                 // The cached layout may predate compositor changes made while no session
-                // was active, https://github.com/rustdesk/rustdesk/issues/15601
+                // was active, https://github.com/polaris/polaris/issues/15601
                 // Read before the rect: an apply that races a layout move is recorded under the
                 // older generation, which only streams built before the move measure under.
                 #[cfg(feature = "drm")]
@@ -753,7 +753,7 @@ pub(super) fn get_capturer_for_display(
                     // `logical_size` field and never touches `physical_size`, so the rect is not
                     // logical. The advertised DRM geometry is physical too, in DELIVERED
                     // orientation: `augment_with_wayland_geometry` transposes width/height for a
-                    // 90/270 output (rustdesk#15886). Whether the portal's caps arrive rotated
+                    // 90/270 output (polaris#15886). Whether the portal's caps arrive rotated
                     // is UNMEASURED on a rotated display (pipewiresrc does not apply
                     // SPA_META_VideoTransform), so the size half accepts either orientation
                     // rather than gambling a permanent offline on one of them. Dividing a side

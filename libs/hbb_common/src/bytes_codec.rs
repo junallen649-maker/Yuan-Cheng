@@ -4,7 +4,7 @@ use tokio_util::codec::{Decoder, Encoder};
 
 // Bound speculative allocation from untrusted frame headers.
 const MAX_PREALLOCATED_PAYLOAD_LEN: usize = 256 * 1024;
-/// Largest payload representable by the four-byte RustDesk frame header.
+/// Largest payload representable by the four-byte Polaris frame header.
 pub const MAX_FRAME_LENGTH: usize = 0x3FFF_FFFF;
 
 #[derive(Debug, Clone, Copy)]

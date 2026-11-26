@@ -501,7 +501,7 @@ class _TerminalTabPageState extends State<TerminalTabPage> {
     // Add keyboard shortcut handler
     HardwareKeyboard.instance.addHandler(_handleKeyEvent);
 
-    rustDeskWinManager.setMethodHandler((call, fromWindowId) async {
+    polarisWinManager.setMethodHandler((call, fromWindowId) async {
       print(
           "[Remote Terminal] call ${call.method} with args ${call.arguments} from window $fromWindowId");
       if (call.method == kWindowEventNewTerminal) {

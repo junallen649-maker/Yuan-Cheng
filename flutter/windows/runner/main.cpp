@@ -11,10 +11,10 @@
 #include "flutter_window.h"
 #include "utils.h"
 
-typedef char** (*FUNC_RUSTDESK_CORE_MAIN)(int*);
-typedef void (*FUNC_RUSTDESK_FREE_ARGS)( char**, int);
-typedef int (*FUNC_RUSTDESK_GET_APP_NAME)(wchar_t*, int);
-typedef int (*FUNC_RUSTDESK_IS_DISABLE_INSTALLATION)();
+typedef char** (*FUNC_POLARIS_CORE_MAIN)(int*);
+typedef void (*FUNC_POLARIS_FREE_ARGS)( char**, int);
+typedef int (*FUNC_POLARIS_GET_APP_NAME)(wchar_t*, int);
+typedef int (*FUNC_POLARIS_IS_DISABLE_INSTALLATION)();
 /// Note: `--server`, `--service` are already handled in [core_main.rs].
 const std::vector<std::string> parameters_white_list = {"--install", "--cm"};
 
@@ -23,30 +23,21 @@ const wchar_t* getWindowClassName();
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command)
 {
-  HINSTANCE hInstance = LoadLibraryA("libpolaris.dll");
+  HINSTANCE hInstance = LoadLibraryA("polaris.dll");
   if (!hInstance)
   {
-    hInstance = LoadLibraryA("librustdesk.dll");
-  }
-  if (!hInstance)
-  {
-    std::cout << "Failed to load libpolaris.dll / librustdesk.dll." << std::endl;
+    std::cout << "Failed to load polaris.dll." << std::endl;
     return EXIT_FAILURE;
   }
-  FUNC_RUSTDESK_CORE_MAIN rustdesk_core_main =
-      (FUNC_RUSTDESK_CORE_MAIN)GetProcAddress(hInstance, "polaris_core_main_args");
-  if (!rustdesk_core_main)
-  {
-    rustdesk_core_main =
-        (FUNC_RUSTDESK_CORE_MAIN)GetProcAddress(hInstance, "rustdesk_core_main_args");
-  }
-  if (!rustdesk_core_main)
+  FUNC_POLARIS_CORE_MAIN polaris_core_main =
+      (FUNC_POLARIS_CORE_MAIN)GetProcAddress(hInstance, "polaris_core_main_args");
+  if (!polaris_core_main)
   {
     std::cout << "Failed to get core_main." << std::endl;
     return EXIT_FAILURE;
   }
-  FUNC_RUSTDESK_FREE_ARGS free_c_args =
-      (FUNC_RUSTDESK_FREE_ARGS)GetProcAddress(hInstance, "free_c_args");
+  FUNC_POLARIS_FREE_ARGS free_c_args =
+      (FUNC_POLARIS_FREE_ARGS)GetProcAddress(hInstance, "free_c_args");
   if (!free_c_args)
   {
     std::cout << "Failed to get free_c_args." << std::endl;
@@ -60,7 +51,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
 
   int args_len = 0;
-  char** c_args = rustdesk_core_main(&args_len);
+  char** c_args = polaris_core_main(&args_len);
   if (!c_args)
   {
     std::string args_str = "";
@@ -72,15 +63,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
   std::vector<std::string> rust_args(c_args, c_args + args_len);
   free_c_args(c_args, args_len);
-  FUNC_RUSTDESK_IS_DISABLE_INSTALLATION rustdesk_is_disable_installation =
-      (FUNC_RUSTDESK_IS_DISABLE_INSTALLATION)GetProcAddress(hInstance, "polaris_is_disable_installation");
-  if (!rustdesk_is_disable_installation)
-  {
-    rustdesk_is_disable_installation =
-        (FUNC_RUSTDESK_IS_DISABLE_INSTALLATION)GetProcAddress(hInstance, "rustdesk_is_disable_installation");
-  }
+  FUNC_POLARIS_IS_DISABLE_INSTALLATION polaris_is_disable_installation =
+      (FUNC_POLARIS_IS_DISABLE_INSTALLATION)GetProcAddress(hInstance, "polaris_is_disable_installation");
   bool is_disable_installation =
-      rustdesk_is_disable_installation && rustdesk_is_disable_installation() != 0;
+      polaris_is_disable_installation && polaris_is_disable_installation() != 0;
   const auto installParam = std::string("--install");
   // Flutter reads the original process command line, not only rust_args, so
   // remove the `--install` injected by the portable wrapper here as well. This
@@ -95,13 +81,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
 
   std::wstring app_name = L"Polaris";
-  FUNC_RUSTDESK_GET_APP_NAME get_rustdesk_app_name = (FUNC_RUSTDESK_GET_APP_NAME)GetProcAddress(hInstance, "get_polaris_app_name");
-  if (!get_rustdesk_app_name) {
-    get_rustdesk_app_name = (FUNC_RUSTDESK_GET_APP_NAME)GetProcAddress(hInstance, "get_rustdesk_app_name");
-  }
-  if (get_rustdesk_app_name) {
+  FUNC_POLARIS_GET_APP_NAME get_polaris_app_name = (FUNC_POLARIS_GET_APP_NAME)GetProcAddress(hInstance, "get_polaris_app_name");
+  if (get_polaris_app_name) {
     wchar_t app_name_buffer[512] = {0};
-    if (get_rustdesk_app_name(app_name_buffer, 512) == 0) {
+    if (get_polaris_app_name(app_name_buffer, 512) == 0) {
       app_name = std::wstring(app_name_buffer);
     }
   }
@@ -122,7 +105,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
             for (auto& ch : pathStr) {
               ch = static_cast<wchar_t>(::towlower(ch));
             }
-            if (pathStr.find(L"polaris") != std::wstring::npos || pathStr.find(L"rustdesk") != std::wstring::npos) {
+            if (pathStr.find(L"polaris") != std::wstring::npos) {
               hwnd = found;
             }
           }

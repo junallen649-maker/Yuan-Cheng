@@ -12,7 +12,7 @@ object FFI {
         try {
             System.loadLibrary("polaris")
         } catch (e: UnsatisfiedLinkError) {
-            System.loadLibrary("rustdesk")
+            System.loadLibrary("polaris")
         }
     }
 

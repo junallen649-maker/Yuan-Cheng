@@ -846,7 +846,7 @@ pub fn is_letter_rdev_key(key: &rdev::Key) -> bool {
     )
 }
 
-// https://github.com/rustdesk/rustdesk/issues/8599
+// https://github.com/polaris/polaris/issues/8599
 // We just add these keys as letter keys.
 #[inline]
 pub fn is_letter_rdev_key_ex(key: &rdev::Key) -> bool {
@@ -1302,7 +1302,7 @@ fn _map_keyboard_mode(_peer: &str, event: &Event, mut key_event: KeyEvent) -> Op
     #[cfg(target_os = "windows")]
     let keycode = match _peer {
         OS_LOWER_WINDOWS => {
-            // https://github.com/rustdesk/rustdesk/issues/1371
+            // https://github.com/polaris/polaris/issues/1371
             // Filter scancodes that are greater than 255 and the height word is not 0xE0.
             if event.position_code > 255 && (event.position_code >> 8) != 0xE0 {
                 return None;
@@ -1455,7 +1455,7 @@ fn is_press(event: &Event) -> bool {
     matches!(event.event_type, EventType::KeyPress(_))
 }
 
-// https://github.com/rustdesk/rustdesk/wiki/FAQ#keyboard-translation-modes
+// https://github.com/polaris/polaris/wiki/FAQ#keyboard-translation-modes
 pub fn translate_keyboard_mode(peer: &str, event: &Event, key_event: KeyEvent) -> Vec<KeyEvent> {
     let mut events: Vec<KeyEvent> = Vec::new();
 

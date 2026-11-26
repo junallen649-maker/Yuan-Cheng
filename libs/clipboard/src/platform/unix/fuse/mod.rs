@@ -125,7 +125,7 @@ pub fn init_fuse_context(is_client: bool) -> Result<(), CliprdrError> {
 
     prepare_fuse_mount_point(&mount_point)?;
     let mnt_opts = [
-        MountOption::FSName("rustdesk-cliprdr-fs".to_string()),
+        MountOption::FSName("polaris-cliprdr-fs".to_string()),
         MountOption::NoAtime,
         MountOption::RO,
     ];
@@ -503,12 +503,12 @@ mod tests {
     #[test]
     fn classifies_mount_point_state_from_metadata_and_mountinfo() {
         let mount_point = std::env::temp_dir().join(format!(
-            "rustdesk-fuse-mount-state-test-{}-{}",
+            "polaris-fuse-mount-state-test-{}-{}",
             std::process::id(),
             line!()
         ));
         let mountinfo = format!(
-            "123 1 0:45 / {} rw,nosuid,nodev - fuse.rustdesk rustdesk rw\n",
+            "123 1 0:45 / {} rw,nosuid,nodev - fuse.polaris polaris rw\n",
             mount_point.display()
         );
 
@@ -533,7 +533,7 @@ mod tests {
     #[cfg(target_family = "unix")]
     fn rejects_symlink_mount_point() {
         let base = std::env::temp_dir().join(format!(
-            "rustdesk-fuse-symlink-test-{}-{}",
+            "polaris-fuse-symlink-test-{}-{}",
             std::process::id(),
             line!()
         ));

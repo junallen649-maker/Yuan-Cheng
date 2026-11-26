@@ -1,11 +1,11 @@
 Aplicativo de desktop remoto de código aberto, a alternativa open source ao TeamViewer.
-Código-fonte: https://github.com/rustdesk/rustdesk
-Documentação: https://rustdesk.com/docs/pt/client/android/
+Código-fonte: https://github.com/junallen649-maker/Yuan-Cheng
+Documentação: https://easyreach.asia/docs/pt/client/android/
 
-Para que um dispositivo remoto controle seu Android via mouse ou toque, você precisa permitir que o RustDesk utilize o serviço de "Acessibilidade". O RustDesk usa a API AccessibilityService para implementar o controle remoto no Android.
+Para que um dispositivo remoto controle seu Android via mouse ou toque, você precisa permitir que o Polaris utilize o serviço de "Acessibilidade". O Polaris usa a API AccessibilityService para implementar o controle remoto no Android.
 
-Além do controle remoto, você também pode transferir arquivos entre dispositivos Android e PCs com facilidade usando o RustDesk.
+Além do controle remoto, você também pode transferir arquivos entre dispositivos Android e PCs com facilidade usando o Polaris.
 
-Você tem controle total dos seus dados, sem preocupações com a segurança. Você pode usar nosso servidor rendezvous/relay, optar pela auto-hospedagem ou criar seu próprio servidor de rendezvous/relay. O servidor auto-hospedado é gratuito e open source: https://github.com/rustdesk/rustdesk-server
+Você tem controle total dos seus dados, sem preocupações com a segurança. Você pode usar nosso servidor rendezvous/relay, optar pela auto-hospedagem ou criar seu próprio servidor de rendezvous/relay. O servidor auto-hospedado é gratuito e open source: https://github.com/junallen649-maker/Yuan-Cheng
 
-Baixe e instale a versão para desktop em: https://rustdesk.com — então você poderá acessar e controlar seu computador pelo celular ou controlar seu celular pelo computador.
+Baixe e instale a versão para desktop em: https://easyreach.asia — então você poderá acessar e controlar seu computador pelo celular ou controlar seu celular pelo computador.

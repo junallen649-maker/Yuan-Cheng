@@ -558,7 +558,7 @@ impl Proxy {
                 // NOTE: Maybe it's better to check if the error is related to TLS here. (ProxyError::IoError(e), or ProxyError::NativeTlsError(e))
                 // But we can only get the error when the TLS protocol is TLSv1.1.
                 // The error message of the following is unclear:
-                // https://github.com/rustdesk/rustdesk-server-pro/issues/189#issuecomment-1895701480
+                // https://github.com/polaris/polaris-server-pro/issues/189#issuecomment-1895701480
                 // So we just try to fallback unconditionally here.
                 //
                 // If the protocol is TLS 1.1, the error is:

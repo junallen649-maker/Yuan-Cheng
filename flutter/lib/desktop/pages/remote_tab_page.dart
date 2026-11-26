@@ -107,7 +107,7 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
       _update_remote_count();
     }
     tabController.onRemoved = (_, id) => onRemoveId(id);
-    rustDeskWinManager.setMethodHandler(_remoteMethodHandler);
+    polarisWinManager.setMethodHandler(_remoteMethodHandler);
   }
 
   @override

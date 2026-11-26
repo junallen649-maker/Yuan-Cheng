@@ -30,7 +30,7 @@ impl KcpStream {
     // Opt in to KCP's built-in congestion window (nc=0) instead of the pure turbo profile
     // (nc=1) that has always shipped; see `get_kcp_cc_enabled` for why this is not the default.
     // Sender-side only, so no wire negotiation is needed and either peer may run either profile.
-    // Requires kcp-sys from the `rustdesk-patches` branch, which wires the config factory into
+    // Requires kcp-sys from the `polaris-patches` branch, which wires the config factory into
     // connection setup (on older revs the factory was stored but never consulted).
     fn apply_kcp_config(endpoint: &mut KcpEndpoint) {
         if crate::get_kcp_cc_enabled() {
@@ -249,7 +249,7 @@ mod tests {
     // A writer that queues many frames and closes immediately must not cost the
     // reader any of them: every frame arrives intact, in order, before end-of-stream.
     // This is the client-side pin for the kcp-sys close-tail-drain semantics, through
-    // the real BytesCodec framing rustdesk sessions use.
+    // the real BytesCodec framing polaris sessions use.
     #[tokio::test]
     async fn test_kcp_stream_close_delivers_all_frames() {
         let ((_guard_a, mut tx), (_guard_b, mut rx)) = establish().await;

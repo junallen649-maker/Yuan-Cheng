@@ -40,7 +40,7 @@ const MIN_POINTER_BUTTONS: usize = 9;
 /// Check that the X11 core pointer's button map includes at least 9 buttons
 /// so that `XTestFakeButtonEvent` can simulate Back (8) and Forward (9).
 ///
-/// RustDesk's uinput "Mouse passthrough" device normally provides enough
+/// Polaris's uinput "Mouse passthrough" device normally provides enough
 /// buttons, but we log a warning if the map is too small so the issue is
 /// diagnosable. `XSetPointerMapping` cannot extend the button count (its
 /// length must match `XGetPointerMapping`), so we only diagnose here.

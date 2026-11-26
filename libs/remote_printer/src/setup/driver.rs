@@ -81,7 +81,7 @@ fn find_inf(name: &PCWSTR) -> ResultType<Vec<u16>> {
 
 fn delete_printer_driver(name: &PCWSTR) -> ResultType<()> {
     unsafe {
-        // If the printer is used after the spooler service is started. E.g., printing a document through RustDesk Printer.
+        // If the printer is used after the spooler service is started. E.g., printing a document through Polaris Printer.
         // `DeletePrinterDriverExW()` may fail with `ERROR_PRINTER_DRIVER_IN_USE`(3001, 0xBB9).
         // We can only ignore this error for now.
         // Though restarting the spooler service is a solution, it's not a good idea to restart the service.

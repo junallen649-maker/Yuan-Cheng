@@ -26,11 +26,11 @@
         <true />
         <key>ProgramArguments</key>
         <array>
-            <string>/Applications/RustDesk.app/Contents/MacOS/RustDesk</string>
+            <string>/Applications/Polaris.app/Contents/MacOS/Polaris</string>
             <string>--server</string>
         </array>
         <key>WorkingDirectory</key>
-        <string>/Applications/RustDesk.app/Contents/MacOS/</string>
+        <string>/Applications/Polaris.app/Contents/MacOS/</string>
         <key>ProcessType</key>
         <string>Interactive</string>
     </dict>

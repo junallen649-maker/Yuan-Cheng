@@ -118,9 +118,9 @@ mod tests {
             .unwrap()
             .as_nanos();
         let missing_parent = std::env::temp_dir()
-            .join(format!("rustdesk-screenshot-missing-parent-{unique}"))
+            .join(format!("polaris-screenshot-missing-parent-{unique}"))
             .join("screenshot.png");
-        let valid_path = std::env::temp_dir().join(format!("rustdesk-screenshot-{unique}.png"));
+        let valid_path = std::env::temp_dir().join(format!("polaris-screenshot-{unique}.png"));
 
         let error = screenshot.handle_screenshot(format!("0:{}", missing_parent.display()));
 

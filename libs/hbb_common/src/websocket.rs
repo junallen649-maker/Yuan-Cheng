@@ -406,8 +406,8 @@ pub fn check_ws(endpoint: &str) -> String {
         (false, endpoint_port + 3)
     } else if endpoint_port == relay_port || endpoint_port == rendezvous_port + 1 {
         // relay
-        // https://github.com/rustdesk/rustdesk/blob/6ffbcd1375771f2482ec4810680623a269be70f1/src/rendezvous_mediator.rs#L615
-        // https://github.com/rustdesk/rustdesk-server/blob/235a3c326ceb665e941edb50ab79faa1208f7507/src/relay_server.rs#L83, based on relay port.
+        // https://github.com/polaris/polaris/blob/6ffbcd1375771f2482ec4810680623a269be70f1/src/rendezvous_mediator.rs#L615
+        // https://github.com/polaris/polaris-server/blob/235a3c326ceb665e941edb50ab79faa1208f7507/src/relay_server.rs#L83, based on relay port.
         (true, endpoint_port + 2)
     } else {
         // fallback relay

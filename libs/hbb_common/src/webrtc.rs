@@ -1,4 +1,4 @@
-//! WebRTC transport for RustDesk streams.
+//! WebRTC transport for Polaris streams.
 //!
 //! # Bumping the webrtc crate
 //!
@@ -83,7 +83,7 @@ pub struct WebRTCStream {
     // SINGLE READER ONLY: reassembly spans calls and the fragment header carries no length or
     // sequence number, so two readers splice unrelated fragments into one wrong-but-valid message.
     recv_state: Arc<Mutex<RecvState>>,
-    // True once the controller has completed the RustDesk identity binding (DTLS fingerprint
+    // True once the controller has completed the Polaris identity binding (DTLS fingerprint
     // matched to the signed peer id, via `set_key`). DTLS always encrypts; this flag mirrors TCP's
     // "secured after key exchange" so key-less / unbound WebRTC is not shown as peer-authenticated.
     peer_verified: Arc<AtomicBool>,
@@ -942,7 +942,7 @@ impl WebRTCStream {
     /// One-shot endpoint: waits for ICE gathering so the SDP already carries the candidates.
     /// The wait is deliberately unbounded — a deadline here would return a half-gathered SDP and
     /// defeat the contract; callers needing one should wrap the call or use the trickle variant,
-    /// which both rustdesk signaling paths do. Remaining callers are the loopback tests and
+    /// which both polaris signaling paths do. Remaining callers are the loopback tests and
     /// `examples/webrtc.rs`, neither of which bounds it.
     #[inline]
     pub async fn get_local_endpoint(&self) -> ResultType<String> {

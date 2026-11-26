@@ -164,7 +164,7 @@ const MIRROR_AGREEMENT_PERCENT: u64 = 88;
 ///
 /// Two shapes stay further out than master and no bitmap rule reaches them: `help`, whose click
 /// point the theme puts on the dot of its question mark, and `alias` by half a pixel. That is why
-/// a hotspot the driver publishes is always preferred to this, and why rustdesk#16122 recovers it
+/// a hotspot the driver publishes is always preferred to this, and why polaris#16122 recovers it
 /// exactly from the injected pointer instead of guessing.
 pub fn infer_hotspot(rgba: &[u8], w: usize, h: usize) -> (i32, i32) {
     let (mut minx, mut miny, mut maxx, mut maxy) = (w as i32, h as i32, -1i32, -1i32);
@@ -182,7 +182,7 @@ pub fn infer_hotspot(rgba: &[u8], w: usize, h: usize) -> (i32, i32) {
     }
     let (bw, bh) = (maxx - minx + 1, maxy - miny + 1);
     let (cx, cy) = ((minx + maxx) / 2, (miny + maxy) / 2);
-    // An elongated box keeps its centre whichever way it lies (rustdesk#16242): a bar has no
+    // An elongated box keeps its centre whichever way it lies (polaris#16242): a bar has no
     // corner to speak of. Kept ahead of the mirror test so it still covers an elongated shape
     // that is NOT symmetric, which the theme happens not to contain but a custom cursor can.
     if bh > bw * 2 || bw > bh * 2 {
@@ -970,7 +970,7 @@ mod hotspot_guess_tests {
 
     /// The elongation rule stays ahead of the mirror test, so a bar that is NOT symmetric still
     /// keeps its centre. Nothing in the installed theme is shaped like this - its two I-beams are
-    /// both symmetric - but a custom cursor can be, and this is the rustdesk#16242 round-one fix.
+    /// both symmetric - but a custom cursor can be, and this is the polaris#16242 round-one fix.
     #[test]
     fn an_elongated_shape_keeps_its_centre_even_when_it_is_lopsided() {
         let (px, w, h) = sprite(&["##########.", "#####......", "##########."]);

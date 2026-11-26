@@ -541,7 +541,7 @@ mod tests {
 
     fn unique_acl_test_path(prefix: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
-            "rustdesk_acl_{}_{}_{}",
+            "polaris_acl_{}_{}_{}",
             prefix,
             std::process::id(),
             hbb_common::rand::random::<u32>()

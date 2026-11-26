@@ -76,7 +76,7 @@ pub(super) fn embedded_shortcut_commands(bytes: Vec<u8>, filename: &str, name: &
     let encoded_path = format!("%~f0.{name}.b64");
     format!(
         "> \"{encoded_path}\" echo {encoded}\r\n\
-         certutil -f -decode \"{encoded_path}\" \"%RUSTDESK_OUTPUT_DIR%\\{filename}\" > nul || exit /b {BATCH_SHORTCUT_DECODE_FAILURE_EXIT_CODE}"
+         certutil -f -decode \"{encoded_path}\" \"%POLARIS_OUTPUT_DIR%\\{filename}\" > nul || exit /b {BATCH_SHORTCUT_DECODE_FAILURE_EXIT_CODE}"
     )
 }
 
@@ -275,9 +275,9 @@ mod tests {
     #[test]
     fn install_values_enforce_command_safety() {
         assert!(validate_install_value(r"C:\safe ! path").is_ok());
-        assert!(validate_install_value(r"C:\Program Files (x86)\RustDesk").is_ok());
-        assert!(validate_install_value(r"C:\Users\R&D\RustDesk.exe").is_ok());
-        assert!(validate_install_value(r"C:\A&^ B\RustDesk.exe").is_ok());
+        assert!(validate_install_value(r"C:\Program Files (x86)\Polaris").is_ok());
+        assert!(validate_install_value(r"C:\Users\R&D\Polaris.exe").is_ok());
+        assert!(validate_install_value(r"C:\A&^ B\Polaris.exe").is_ok());
         for character in ['\0', '"', '%', '\r', '\n', '|', '<', '>'] {
             let value = format!(r"C:\unsafe{character}path");
             assert!(
@@ -290,8 +290,8 @@ mod tests {
     #[test]
     fn nested_commands_escape_while_protected_environment_preserves_carets() {
         assert_eq!(
-            escape_nested_cmd_ampersands(r"C:\A&^ B\RustDesk.exe"),
-            r"C:\A^&^^ B\RustDesk.exe"
+            escape_nested_cmd_ampersands(r"C:\A&^ B\Polaris.exe"),
+            r"C:\A^&^^ B\Polaris.exe"
         );
         let path = Path::new(r"C:\Win^Root\System32");
         let environment = trusted_install_environment_from_paths(path, path, path).unwrap();

@@ -301,7 +301,7 @@ pub fn clear_wayland_displays_cache() {
 // clears: session inits and hotplug workers clear the cache too, and a bump there tears down
 // every OTHER live capturer on a multi-display session. A capturer records this at build and
 // treats a later bump as "the layout changed under me, rebuild" — the only trigger a rotation
-// has, since it changes neither the CRTC mode nor the framebuffer size (rustdesk#15886).
+// has, since it changes neither the CRTC mode nor the framebuffer size (polaris#15886).
 static SNAPSHOT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 /// Whether no snapshot has been cached: the signature of an enumeration that failed at session
@@ -329,7 +329,7 @@ pub fn get_desktop_rect_for_uinput() -> Option<(i32, i32, i32, i32)> {
 
 // The desktop rect and per-display logical rects, read live from the compositor in a single
 // roundtrip (drm builds may skip a turn during the failure backoff). Skips the displays cache
-// and the primary-monitor detection, cheap enough to poll. rustdesk/rustdesk#15601
+// and the primary-monitor detection, cheap enough to poll. polaris/polaris#15601
 pub fn get_layout_for_uinput_live() -> Option<((i32, i32, i32, i32), Vec<DisplayRect>)> {
     #[cfg(feature = "drm")]
     if backed_off() {
@@ -465,7 +465,7 @@ pub fn get_display_rects_for_uinput() -> Vec<DisplayRect> {
 ///
 /// Returns the input unchanged when the point is outside every baseline display or the
 /// matched display is gone, so a failed match never moves the cursor further off than
-/// leaving it alone. https://github.com/rustdesk/rustdesk/issues/15601
+/// leaving it alone. https://github.com/polaris/polaris/issues/15601
 pub fn remap_to_live_layout(
     x: i32,
     y: i32,
@@ -602,7 +602,7 @@ mod tests {
 
     #[test]
     fn a_single_rotated_display_swaps_the_uinput_rect() {
-        // Review finding 1 on rustdesk#15889: the single-display branch served the unrotated
+        // Review finding 1 on polaris#15889: the single-display branch served the unrotated
         // mode, so the pointer could not reach ~44% of a portrait screen.
         let mut d = display(0, 0, 1920, 1080, None);
         d.transform = 90;
