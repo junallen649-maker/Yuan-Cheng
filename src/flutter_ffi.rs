@@ -2471,6 +2471,10 @@ pub fn main_has_file_clipboard() -> SyncReturn<bool> {
 }
 
 pub fn main_has_gpu_texture_render() -> SyncReturn<bool> {
+    #[cfg(windows)]
+    if super::flutter::is_swiftshader_angle() {
+        return SyncReturn(false);
+    }
     SyncReturn(cfg!(feature = "vram"))
 }
 

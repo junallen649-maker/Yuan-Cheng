@@ -1769,6 +1769,13 @@ pub fn session_register_gpu_texture(_session_id: SessionID, _display: usize, _ou
     }
 }
 
+#[cfg(windows)]
+pub(crate) fn is_swiftshader_angle() -> bool {
+    std::env::var("ANGLE_DEFAULT_PLATFORM")
+        .map(|v| v.eq_ignore_ascii_case("swiftshader"))
+        .unwrap_or(false)
+}
+
 #[inline]
 #[cfg(not(feature = "vram"))]
 pub fn get_adapter_luid() -> Option<i64> {
@@ -1777,6 +1784,10 @@ pub fn get_adapter_luid() -> Option<i64> {
 
 #[cfg(feature = "vram")]
 pub fn get_adapter_luid() -> Option<i64> {
+    #[cfg(windows)]
+    if is_swiftshader_angle() {
+        return None;
+    }
     if !crate::ui_interface::use_texture_render() {
         return None;
     }

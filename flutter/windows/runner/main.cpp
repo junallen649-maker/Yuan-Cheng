@@ -5,6 +5,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 
 #include "win32_desktop.h"
@@ -23,6 +24,15 @@ const wchar_t* getWindowClassName();
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command)
 {
+  // Avoid Windows 11 / Intel / virtual-display ANGLE D3D11 white-screen blank frames
+  // by defaulting ANGLE to SwiftShader unless explicitly overridden.
+  if (::GetEnvironmentVariableA("ANGLE_DEFAULT_PLATFORM", nullptr, 0) == 0 &&
+      ::GetLastError() == ERROR_ENVVAR_NOT_FOUND)
+  {
+    ::SetEnvironmentVariableA("ANGLE_DEFAULT_PLATFORM", "swiftshader");
+    ::_putenv_s("ANGLE_DEFAULT_PLATFORM", "swiftshader");
+  }
+
   HINSTANCE hInstance = LoadLibraryA("polaris.dll");
   if (!hInstance)
   {
