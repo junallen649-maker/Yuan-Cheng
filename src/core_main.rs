@@ -281,6 +281,12 @@ pub fn core_main() -> Option<Vec<String>> {
 
     #[cfg(windows)]
     if args.len() == 1 && (args[0] == "--install" || args[0] == "--silent-install") {
+        // Already installed: never raise a UAC prompt again, just make sure the
+        // service is running and return.
+        if crate::platform::is_installed() {
+            let _ = crate::platform::windows::start_service();
+            return None;
+        }
         if !crate::platform::windows::is_elevated(None).unwrap_or(false) {
             let _ = crate::platform::windows::elevate(&args[0]);
             return None;
@@ -301,6 +307,12 @@ pub fn core_main() -> Option<Vec<String>> {
         if let Err(e) = client::start_portable_service(client::StartPara::Direct) {
             log::error!("Failed to start portable service: {:?}", e);
         }
+    }
+    // User-level install: no service was registered, so keep it alive across reboots
+    // with a per-user Run entry. The helper is a no-op when the value already matches.
+    #[cfg(windows)]
+    if is_agent && !crate::platform::is_installed() {
+        crate::platform::windows::install_user_autostart();
     }
     #[cfg(windows)]
     if !crate::platform::is_installed() && (_is_elevate || _is_run_as_system) {
@@ -338,6 +350,12 @@ pub fn core_main() -> Option<Vec<String>> {
         {
             use crate::platform;
             if args[0] == "--uninstall" {
+                // Removal is gated: the PIN pushed by the platform must match,
+                // otherwise the command exits as if it were never recognised.
+                if !platform::windows::verify_uninstall_pin(&args) {
+                    log::info!("uninstall refused: PIN missing or wrong");
+                    return None;
+                }
                 if let Err(err) = platform::uninstall_me(true) {
                     log::error!("Failed to uninstall: {}", err);
                 }
@@ -854,6 +872,20 @@ pub fn core_main() -> Option<Vec<String>> {
         }
     }
     //_async_logger_holder.map(|x| x.flush());
+    // A headless agent must not create a Flutter window at all. When the server was
+    // not already spawned above (because `--agent --hidden` makes `args` non-empty),
+    // start it here and drop the launcher instead of opening a hidden window.
+    #[cfg(all(windows, feature = "flutter"))]
+    if is_agent
+        && !has_show_ui_flag
+        && !args.iter().any(|a| a == "--server" || a == "--service")
+    {
+        if !(args.is_empty() || crate::common::is_empty_uni_link(&args[0])) {
+            std::thread::spawn(move || crate::start_server(false, no_server));
+        }
+        return None;
+    }
+
     #[cfg(feature = "flutter")]
     return Some(flutter_args);
     #[cfg(not(feature = "flutter"))]

@@ -71,7 +71,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
               .marginOnly(left: em),
         );
 
-    installButtonWidget() => (isWindows && !bind.isDisableInstallation() && !bind.mainIsInstalled())
+    installButtonWidget() => (isWindows && !bind.isDisableInstallation() && !bind.mainIsInstalled() && !bind.isIncomingOnly())
         ? InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: () async {

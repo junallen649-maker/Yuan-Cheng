@@ -671,7 +671,7 @@ func (h *Handler) HandleAuditOutgoing(c *gin.Context) {
 			Hostname:   req.PeerName,
 			Username:   req.PeerUsername,
 			OS:         req.PeerPlatform,
-			GroupID:    1,
+			GroupID:    h.ensureSchoolDefaultGroup(h.DB, 1),
 			LastSeenAt: now,
 		}
 		_ = h.DB.Create(&agentDev).Error
@@ -829,8 +829,9 @@ func (h *Handler) HandleClientLogin(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误"})
 		return
 	}
+	ident := strings.TrimSpace(req.Username)
 	var user model.User
-	if err := h.DB.Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error; err != nil {
+	if ident == "" || h.DB.Where("username = ? OR (email != '' AND email = ?)", ident, ident).First(&user).Error != nil {
 		c.JSON(http.StatusOK, gin.H{"error": "账号或密码错误"})
 		return
 	}
@@ -859,7 +860,7 @@ func (h *Handler) HandleClientLogin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"access_token": token,
 		"type":         "access_token",
-		"user":         toClientUserPayload(&user),
+		"user":         h.clientUserPayload(&user),
 	})
 }
 
@@ -873,7 +874,7 @@ func (h *Handler) HandleCurrentUser(c *gin.Context) {
 	if req.ID != "" {
 		h.DB.Model(&model.Device{}).Where("id = ?", req.ID).Update("bound_user", u.Username)
 	}
-	c.JSON(http.StatusOK, toClientUserPayload(u))
+	c.JSON(http.StatusOK, h.clientUserPayload(u))
 }
 
 func (h *Handler) HandleClientLogout(c *gin.Context) {
@@ -891,6 +892,9 @@ func (h *Handler) HandleAccessibleGroups(c *gin.Context) {
 	u := c.MustGet("user").(*model.User)
 	var groups []model.DeviceGroup
 	query := h.DB.Order("id ASC")
+	if u.SchoolID > 0 {
+		query = query.Where("school_id = ?", u.SchoolID)
+	}
 	if !u.IsAdmin && u.Role != "admin" {
 		allowed := parseAllowedGroups(u.AllowedGroups)
 		if len(allowed) > 0 {
@@ -911,11 +915,25 @@ func (h *Handler) HandleAccessibleGroups(c *gin.Context) {
 }
 
 func (h *Handler) HandleClientUsers(c *gin.Context) {
+	u := c.MustGet("user").(*model.User)
+	q := h.DB.Where("status = 1").Order("id ASC")
+	if u.SchoolID > 0 {
+		q = q.Where("school_id = ?", u.SchoolID)
+	}
 	var users []model.User
-	h.DB.Where("status = 1").Order("id ASC").Find(&users)
+	q.Find(&users)
+
+	var schools []model.School
+	h.DB.Find(&schools)
+	schoolNames := make(map[uint]string, len(schools)+1)
+	schoolNames[0] = "全平台"
+	for _, s := range schools {
+		schoolNames[s.ID] = s.Name
+	}
+
 	data := make([]gin.H, 0, len(users))
 	for i := range users {
-		data = append(data, toClientUserPayload(&users[i]))
+		data = append(data, toClientUserPayload(&users[i], schoolNames[users[i].SchoolID]))
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"total": len(data),
@@ -933,6 +951,9 @@ func (h *Handler) HandleClientPeers(c *gin.Context) {
 	}
 
 	query := h.DB.Where("client_role != ?", "console").Order("last_seen_at DESC")
+	if u.SchoolID > 0 {
+		query = query.Where("school_id = ?", u.SchoolID)
+	}
 	if !u.IsAdmin && u.Role != "admin" {
 		allowed := parseAllowedGroups(u.AllowedGroups)
 		if len(allowed) > 0 {
@@ -1011,7 +1032,7 @@ func (h *Handler) HandleABSettings(c *gin.Context) {
 }
 
 func (h *Handler) HandleABPersonal(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"guid": ""})
+	c.JSON(http.StatusOK, gin.H{"guid": nil})
 }
 
 func (h *Handler) HandleABSharedProfiles(c *gin.Context) {
@@ -1035,7 +1056,20 @@ func (h *Handler) defaultGroupIDForRoleInSchool(role string, schoolID uint) uint
 	return h.ensureSchoolDefaultGroup(h.DB, schoolID)
 }
 
-func toClientUserPayload(u *model.User) gin.H {
+func (h *Handler) clientUserPayload(u *model.User) gin.H {
+	schoolName := "全平台"
+	if u.SchoolID > 0 {
+		var s model.School
+		if h.DB.First(&s, u.SchoolID).Error == nil {
+			schoolName = s.Name
+		} else {
+			schoolName = ""
+		}
+	}
+	return toClientUserPayload(u, schoolName)
+}
+
+func toClientUserPayload(u *model.User, schoolName string) gin.H {
 	return gin.H{
 		"name":         u.Username,
 		"display_name": u.DisplayName,
@@ -1044,6 +1078,8 @@ func toClientUserPayload(u *model.User) gin.H {
 		"note":         u.Note,
 		"status":       u.Status,
 		"is_admin":     u.IsAdmin,
+		"school_id":    u.SchoolID,
+		"school_name":  schoolName,
 		"info":         gin.H{},
 	}
 }

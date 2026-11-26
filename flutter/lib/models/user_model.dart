@@ -19,6 +19,8 @@ class UserModel {
   final RxString displayName = ''.obs;
   final RxString avatar = ''.obs;
   final RxBool isAdmin = false.obs;
+  final RxInt schoolId = 0.obs;
+  final RxString schoolName = ''.obs;
   final RxString networkError = ''.obs;
   // True when networkError carries a server-reported error rather than a
   // connectivity failure; netWorkErrorWidget hides the network tip then.
@@ -50,7 +52,7 @@ class UserModel {
     });
   }
 
-  void refreshCurrentUser() async {
+  Future<void> refreshCurrentUser() async {
     if (bind.isDisableAccount()) return;
     networkError.value = '';
     networkErrorFromServer.value = false;
@@ -132,6 +134,11 @@ class UserModel {
       userName.value = (userInfo['name'] ?? '').toString();
       displayName.value = (userInfo['display_name'] ?? '').toString();
       avatar.value = (userInfo['avatar'] ?? '').toString();
+      isAdmin.value = userInfo['is_admin'] == true;
+      schoolId.value = userInfo['school_id'] is int
+          ? userInfo['school_id']
+          : int.tryParse('${userInfo['school_id'] ?? 0}') ?? 0;
+      schoolName.value = (userInfo['school_name'] ?? '').toString();
     }
   }
 
@@ -145,6 +152,9 @@ class UserModel {
     userName.value = '';
     displayName.value = '';
     avatar.value = '';
+    isAdmin.value = false;
+    schoolId.value = 0;
+    schoolName.value = '';
   }
 
   _parseAndUpdateUser(UserPayload user) {
@@ -152,6 +162,8 @@ class UserModel {
     displayName.value = user.displayName;
     avatar.value = user.avatar;
     isAdmin.value = user.isAdmin;
+    schoolId.value = user.schoolId;
+    schoolName.value = user.schoolName;
     bind.mainSetLocalOption(key: 'user_info', value: jsonEncode(user));
     if (isWeb) {
       // ugly here, tmp solution

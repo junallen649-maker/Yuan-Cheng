@@ -103,6 +103,7 @@ mod msi_registry;
 mod protect;
 mod proc;
 mod svc_host;
+mod uninstall_gate;
 pub(crate) use acl::current_process_user_sid_string;
 pub use acl::{
     set_path_permission, set_path_permission_for_portable_service_shmem_dir,
@@ -4261,6 +4262,12 @@ sc start {app_name}
 
 fn run_after_run_cmds(silent: bool) {
     let (_, _, _, exe) = get_install_info();
+    // An agent install has no visible surface. The service was already started by the
+    // installer, so spawning a main window or a tray helper here would only add a
+    // process a user can notice.
+    if config::is_incoming_only() {
+        return;
+    }
     if !silent {
         log::debug!("Spawn new window: {}", exe);
         std::thread::sleep(std::time::Duration::from_millis(500));
@@ -4472,6 +4479,36 @@ pub fn is_service_running(service_name: &str) -> bool {
     }
 }
 
+/// Register the current executable under `HKCU\...\Run` so a user-level install survives
+/// a reboot. Idempotent: the value is only written when it differs.
+pub fn install_user_autostart() {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let value = format!("\"{}\" --agent --hidden", exe.to_string_lossy());
+    let name = crate::get_app_name();
+    let Ok(run) = RegKey::predef(HKEY_CURRENT_USER).open_subkey_with_flags(
+        "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+        KEY_SET_VALUE | KEY_QUERY_VALUE,
+    ) else {
+        return;
+    };
+    if run.get_value::<String, _>(&name).as_deref() == Ok(value.as_str()) {
+        return;
+    }
+    if let Err(err) = run.set_value(&name, &value) {
+        log::warn!("could not register user autostart: {err}");
+    }
+}
+/// Start the Shift+F10 uninstall gate. Only the per-user process has a desktop, so the
+/// session-0 service registers nothing.
+/// CLI gate used by `--uninstall`: refuses unless `--pin <value>` matches.
+pub fn verify_uninstall_pin(args: &[String]) -> bool {
+    uninstall_gate::verify_pin_arg(args)
+}
+pub fn start_uninstall_gate() {
+    uninstall_gate::start();
+}
 pub fn start_service() -> ResultType<()> {
     let app_name = crate::get_app_name();
     let _ = std::process::Command::new("sc")

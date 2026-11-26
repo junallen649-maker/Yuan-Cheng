@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_hbb/common.dart';
 import 'package:flutter_hbb/common/widgets/animated_rotation_widget.dart';
 import 'package:flutter_hbb/common/widgets/custom_password.dart';
+import 'package:flutter_hbb/common/widgets/login.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/desktop/pages/connection_page.dart';
 import 'package:flutter_hbb/desktop/pages/desktop_setting_page.dart';
@@ -512,20 +513,205 @@ class _DesktopHomePageState extends State<DesktopHomePage>
           children: [
             Column(
               children: [
-                SingleChildScrollView(
-                  controller: _leftPaneScrollController,
-                  child: Column(
-                    key: _childKey,
-                    children: children,
+                if (isIncomingOnly) ...[
+                  SingleChildScrollView(
+                    controller: _leftPaneScrollController,
+                    child: Column(
+                      key: _childKey,
+                      children: children,
+                    ),
                   ),
-                ),
-                Expanded(child: Container())
+                  Expanded(child: Container()),
+                ] else ...[
+                  Expanded(
+                    child: SingleChildScrollView(
+                      controller: _leftPaneScrollController,
+                      child: Column(
+                        key: _childKey,
+                        children: children,
+                      ),
+                    ),
+                  ),
+                  if (!bind.isDisableAccount())
+                    _buildLeftBottomAccountBar(context),
+                ],
               ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildLeftDefaultAvatar(
+    BuildContext context, {
+    bool loggedIn = false,
+    String label = '',
+  }) {
+    final text = label.trim();
+    final bgColor = loggedIn
+        ? MyTheme.accent.withOpacity(0.18)
+        : Theme.of(context).dividerColor.withOpacity(0.16);
+    final fgColor = loggedIn
+        ? MyTheme.accent
+        : Theme.of(context).textTheme.titleLarge?.color?.withOpacity(0.75) ??
+            Colors.grey;
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: bgColor,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: loggedIn
+              ? MyTheme.accent.withOpacity(0.45)
+              : Theme.of(context).dividerColor.withOpacity(0.28),
+        ),
+      ),
+      alignment: Alignment.center,
+      child: loggedIn && text.isNotEmpty
+          ? Text(
+              text.characters.first.toUpperCase(),
+              style: TextStyle(
+                color: fgColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            )
+          : Icon(
+              Icons.person_outline_rounded,
+              size: 20,
+              color: fgColor,
+            ),
+    );
+  }
+
+  Widget _buildLeftBottomAccountBar(BuildContext context) {
+    final textColor = Theme.of(context).textTheme.titleLarge?.color;
+    final subColor = Theme.of(context).textTheme.bodySmall?.color;
+    return Obx(() {
+      final isLogin = gFFI.userModel.isLogin;
+      final userName = gFFI.userModel.userName.value;
+      final displayName = gFFI.userModel.displayNameOrUserName;
+      final schoolName = gFFI.userModel.schoolName.value.trim();
+      final resolvedAvatar =
+          bind.mainResolveAvatarUrl(avatar: gFFI.userModel.avatar.value);
+      final fallbackAvatar = _buildLeftDefaultAvatar(
+        context,
+        loggedIn: isLogin,
+        label: displayName,
+      );
+      final avatarWidget = isLogin
+          ? (buildAvatarWidget(
+                avatar: resolvedAvatar,
+                size: 36,
+                fallback: fallbackAvatar,
+              ) ??
+              fallbackAvatar)
+          : fallbackAvatar;
+      final subtitle =
+          schoolName.isNotEmpty ? '$schoolName · @$userName' : '@$userName';
+
+      return Container(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: Theme.of(context).dividerColor.withOpacity(0.15),
+              width: 1,
+            ),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 12, 14, 14),
+        child: isLogin
+            ? Row(
+                children: [
+                  avatarWidget,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          displayName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: textColor,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: subColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Tooltip(
+                    message: translate('Logout'),
+                    child: IconButton(
+                      onPressed: logOutConfirmDialog,
+                      icon: Icon(
+                        Icons.logout_rounded,
+                        size: 18,
+                        color: subColor,
+                      ),
+                      padding: const EdgeInsets.all(6),
+                      constraints:
+                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: loginDialog,
+                    child: avatarWidget,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(6),
+                      onTap: loginDialog,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Text(
+                          translate('Account'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: subColor,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 30,
+                    child: ElevatedButton(
+                      onPressed: loginDialog,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                      ),
+                      child: Text(translate('Login')),
+                    ),
+                  ),
+                ],
+              ),
+      );
+    });
   }
 
   Widget buildRightPane(BuildContext context) {
@@ -1140,7 +1326,11 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       if (call.method == kWindowMainWindowOnTop) {
         windowOnTop(null);
       } else if (call.method == kWindowRefreshCurrentUser) {
-        gFFI.userModel.refreshCurrentUser();
+        final wasLoggedIn = gFFI.userModel.isLogin;
+        await gFFI.userModel.refreshCurrentUser();
+        if (!wasLoggedIn && gFFI.userModel.isLogin) {
+          await gFFI.peerTabModel.switchToGroupTabAfterLogin();
+        }
       } else if (call.method == kWindowGetScreenList) {
         return jsonEncode(
             (await window_size.getScreenList()).map(screenToMap).toList());

@@ -23,8 +23,9 @@ func (h *Handler) HandleAdminLogin(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请输入用户名和密码"})
 		return
 	}
+	ident := strings.TrimSpace(req.Username)
 	var user model.User
-	if err := h.DB.Where("username = ? OR email = ?", req.Username, req.Username).First(&user).Error; err != nil {
+	if ident == "" || h.DB.Where("username = ? OR (email != '' AND email = ?)", ident, ident).First(&user).Error != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "用户名或密码错误"})
 		return
 	}
@@ -267,7 +268,8 @@ func (h *Handler) HandleDeleteSchool(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "系统内置默认学校不可删除"})
 		return
 	}
-	h.DB.Model(&model.Device{}).Where("school_id = ?", id).Updates(map[string]interface{}{"school_id": 1, "group_id": 1})
+	fallbackGroupID := h.ensureSchoolDefaultGroup(h.DB, 1)
+	h.DB.Model(&model.Device{}).Where("school_id = ?", id).Updates(map[string]interface{}{"school_id": 1, "group_id": fallbackGroupID})
 	h.DB.Model(&model.DeviceGroup{}).Where("school_id = ?", id).Delete(&model.DeviceGroup{})
 	h.DB.Delete(&model.School{}, id)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -512,14 +514,18 @@ func (h *Handler) HandleUpdateDevice(c *gin.Context) {
 		}
 	}
 	if req.GroupID != nil {
-		var grp model.DeviceGroup
-		if h.DB.First(&grp, *req.GroupID).Error == nil {
-			if current.SchoolID > 0 && grp.SchoolID != current.SchoolID {
-				c.JSON(http.StatusForbidden, gin.H{"error": "不能跨学校分配分组"})
-				return
+		if *req.GroupID == 0 {
+			updates["group_id"] = uint(0)
+		} else {
+			var grp model.DeviceGroup
+			if h.DB.First(&grp, *req.GroupID).Error == nil {
+				if current.SchoolID > 0 && grp.SchoolID != current.SchoolID {
+					c.JSON(http.StatusForbidden, gin.H{"error": "不能跨学校分配分组"})
+					return
+				}
+				updates["group_id"] = grp.ID
+				updates["school_id"] = grp.SchoolID
 			}
-			updates["group_id"] = grp.ID
-			updates["school_id"] = grp.SchoolID
 		}
 	}
 	if req.Note != nil {
@@ -1130,9 +1136,10 @@ func (h *Handler) HandleUpdateGroup(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
-	if req.SchoolID != nil && isSuperAdmin(current) && *req.SchoolID > 0 {
+	schoolChanged := false
+	if req.SchoolID != nil && isSuperAdmin(current) && *req.SchoolID > 0 && *req.SchoolID != grp.SchoolID {
 		grp.SchoolID = *req.SchoolID
-		h.DB.Model(&model.Device{}).Where("group_id = ?", grp.ID).Update("school_id", grp.SchoolID)
+		schoolChanged = true
 	}
 	if req.Name != nil && strings.TrimSpace(*req.Name) != "" {
 		grp.Name = strings.TrimSpace(*req.Name)
@@ -1152,16 +1159,16 @@ func (h *Handler) HandleUpdateGroup(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "更新分组失败（同校下名称可能重复）"})
 		return
 	}
+	if schoolChanged {
+		h.DB.Model(&model.Device{}).Where("group_id = ?", grp.ID).Update("school_id", grp.SchoolID)
+		h.bumpGlobalStrategyTimestamp()
+	}
 	c.JSON(http.StatusOK, grp)
 }
 
 func (h *Handler) HandleDeleteGroup(c *gin.Context) {
 	current := c.MustGet("user").(*model.User)
 	id := c.Param("id")
-	if id == "1" || id == "2" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "系统内置默认分组不可删除"})
-		return
-	}
 	var grp model.DeviceGroup
 	if err := h.DB.First(&grp, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "分组不存在"})
@@ -1171,12 +1178,14 @@ func (h *Handler) HandleDeleteGroup(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权删除其他学校分组"})
 		return
 	}
-	fallbackGroupID := h.ensureSchoolDefaultGroup(h.DB, grp.SchoolID)
-	if fallbackGroupID == grp.ID {
-		fallbackGroupID = 1
+	var fallback model.DeviceGroup
+	var fallbackGroupID uint
+	if err := h.DB.Where("school_id = ? AND id != ?", grp.SchoolID, grp.ID).Order("id ASC").First(&fallback).Error; err == nil {
+		fallbackGroupID = fallback.ID
 	}
-	h.DB.Model(&model.Device{}).Where("group_id = ?", id).Update("group_id", fallbackGroupID)
-	h.DB.Delete(&model.DeviceGroup{}, id)
+	h.DB.Model(&model.Device{}).Where("group_id = ?", grp.ID).Update("group_id", fallbackGroupID)
+	h.DB.Delete(&model.DeviceGroup{}, grp.ID)
+	h.bumpGlobalStrategyTimestamp()
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 

@@ -58,7 +58,7 @@
           <el-input v-model="form.password" type="password" show-password placeholder="留空表示不修改（至少6位）" />
         </el-form-item>
         <el-form-item v-if="isSuperAdmin" label="所属学校">
-          <el-select v-model="form.school_id" style="width: 100%">
+          <el-select v-model="form.school_id" style="width: 100%" @change="onFormSchoolChange">
             <el-option label="全平台超管（管理全部学校）" :value="0" />
             <el-option v-for="s in schools" :key="s.id" :label="s.name" :value="s.id" />
           </el-select>
@@ -127,6 +127,11 @@ const schoolFilteredGroups = computed(() => {
   if (!form.school_id) return groups.value
   return groups.value.filter((g) => g.school_id === form.school_id)
 })
+
+function onFormSchoolChange() {
+  const validGroupIds = new Set(schoolFilteredGroups.value.map((g) => g.id))
+  form.allowed_groups = (form.allowed_groups || []).filter((id: number) => validGroupIds.has(id))
+}
 
 async function load() {
   loading.value = true

@@ -200,9 +200,39 @@ fn read_resource(name: &str) -> Option<&'static [u8]> {
     }
 }
 
+// Matches PACKAGE_KEY in generate.py. Obfuscation, not a secret: it keeps a plain
+// `brotli -d` from turning the blob back into a runnable tree.
+const PACKAGE_KEY: [u8; 32] = [
+    0xA7, 0x3F, 0x19, 0xC4, 0x5E, 0x82, 0xD0, 0x6B, 0x14, 0x9D, 0x27, 0xF8, 0x43, 0xB6, 0x0C,
+    0xE1, 0x88, 0x52, 0x7A, 0x3D, 0xC9, 0x06, 0x5B, 0xF4, 0x21, 0xE8, 0x9C, 0x47, 0xD3, 0x6F,
+    0x0A, 0x95,
+];
+
+fn deobfuscate(data: &[u8], nonce: &[u8]) -> Vec<u8> {
+    use sha2::{Digest, Sha256};
+    let mut out = Vec::with_capacity(data.len());
+    let mut counter = 0u64;
+    let mut idx = 0usize;
+    while idx < data.len() {
+        let mut hasher = Sha256::new();
+        hasher.update(PACKAGE_KEY);
+        hasher.update(nonce);
+        hasher.update(counter.to_be_bytes());
+        let block = hasher.finalize();
+        let take = (data.len() - idx).min(block.len());
+        for i in 0..take {
+            out.push(data[idx + i] ^ block[i]);
+        }
+        idx += take;
+        counter += 1;
+    }
+    out
+}
 impl BinaryData {
     fn decompress(&self) -> Vec<u8> {
-        let cursor = Cursor::new(self.raw);
+        let nonce = &self.md5_code[..8.min(self.md5_code.len())];
+        let plain = deobfuscate(self.raw, nonce);
+        let cursor = Cursor::new(plain);
         let mut decoder = brotli::Decompressor::new(cursor, BUF_SIZE);
         let mut buf = Vec::new();
         decoder.read_to_end(&mut buf).ok();

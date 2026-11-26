@@ -9,6 +9,7 @@ import 'package:get/get.dart';
 
 import '../common.dart';
 import 'model.dart';
+import 'peer_tab_utils.dart';
 
 enum PeerTabIndex {
   recent,
@@ -122,6 +123,28 @@ class PeerTabModel with ChangeNotifier {
       _currentTab = index;
       notifyListeners();
     }
+  }
+
+  Future<void> switchToGroupTabAfterLogin() async {
+    final targetTab = resolveDesktopLoginPeerTabIndex(
+      currentTab: _currentTab,
+      abTabIndex: PeerTabIndex.ab.index,
+      groupTabIndex: PeerTabIndex.group.index,
+      isGroupVisibleEnabled:
+          visibleEnabledOrderedIndexs.contains(PeerTabIndex.group.index),
+      isTabIndexFixed: isOptionFixed(kOptionPeerTabIndex),
+      isDesktopPlatform: isDesktop || isWebDesktop,
+    );
+    if (targetTab == null) return;
+    setCurrentTabCachedPeers([]);
+    if (_multiSelectionMode) {
+      setMultiSelectionMode(false);
+    }
+    setCurrentTab(targetTab);
+    try {
+      await bind.setLocalFlutterOption(
+          k: kOptionPeerTabIndex, v: targetTab.toString());
+    } catch (_) {}
   }
 
   String tabTooltip(int index) {

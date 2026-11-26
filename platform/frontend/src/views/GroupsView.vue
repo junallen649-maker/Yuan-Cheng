@@ -72,8 +72,7 @@
           <el-button link type="primary" @click="openDialog(row)">配置策略</el-button>
           <el-button link type="warning" @click="openGroupPasswordDialog(row)">整组改密</el-button>
           <el-popconfirm
-            v-if="row.id > 2"
-            title="删除后该分组设备将移回本校默认机房，确认删除？"
+            title="删除后该分组设备将自动移至本校其他分组或变为未分组，确认删除？"
             @confirm="deleteGroup(row.id)"
           >
             <template #reference>
@@ -84,12 +83,25 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="form.id ? '配置分组与策略' : '新建机房分组'" width="540px">
+    <el-dialog v-model="dialogVisible" :title="form.id ? '配置分组与策略' : '新建机房分组'" width="560px">
       <el-form :model="form" label-width="135px">
-        <el-form-item v-if="isSuperAdmin" label="所属学校">
-          <el-select v-model="form.school_id" style="width: 100%">
-            <el-option v-for="s in schools" :key="s.id" :label="s.name" :value="s.id" />
-          </el-select>
+        <el-form-item v-if="isSuperAdmin || schools.length > 0" label="所属学校">
+          <div class="school-select-row">
+            <el-select
+              v-model="form.school_id"
+              :disabled="!isSuperAdmin"
+              style="flex: 1"
+              placeholder="选择所属学校"
+            >
+              <el-option v-for="s in schools" :key="s.id" :label="s.name" :value="s.id" />
+            </el-select>
+            <el-button v-if="canEditSelectedSchool" plain @click="openSchoolDialog(selectedSchool)">
+              修改学校
+            </el-button>
+            <el-button v-if="isSuperAdmin" type="primary" plain @click="openSchoolDialog()">
+              新增学校
+            </el-button>
+          </div>
         </el-form-item>
         <el-form-item label="分组名称">
           <el-input v-model="form.name" placeholder="例如：一号教学楼-101机房" />
@@ -127,10 +139,48 @@
         <el-form-item label="锁定终端本地设置">
           <el-switch v-model="form.strategy['disable-settings']" active-value="Y" inactive-value="N" />
         </el-form-item>
+        <el-form-item label="卸载口令">
+          <el-input
+            v-model="uninstallPin"
+            type="password"
+            show-password
+            placeholder="设置后仅 Shift+F10 输入此口令才能卸载；留空表示不修改"
+            style="width: 100%"
+          />
+          <div class="sub-text" v-if="form.strategy['uninstall-pin-hash']">已设置（不回显），重新输入可覆盖</div>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="saveGroup">保存并下发</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 快捷新增/修改学校弹窗 -->
+    <el-dialog v-model="schoolDialogVisible" :title="schoolForm.id ? '修改学校信息' : '新增学校'" width="480px">
+      <el-form :model="schoolForm" label-width="125px">
+        <el-form-item label="学校名称">
+          <el-input v-model="schoolForm.name" placeholder="例如：第一实验中学" />
+        </el-form-item>
+        <el-form-item label="学校编码 (前缀)">
+          <el-input v-model="schoolForm.code" placeholder="字母开头 2~8 位，如 yz、syxx" />
+        </el-form-item>
+        <el-form-item label="入校分发码">
+          <el-input v-model="schoolForm.enroll_token" placeholder="留空自动生成 code-enroll" />
+        </el-form-item>
+        <el-form-item label="首次入网自动发号">
+          <el-switch v-model="schoolForm.auto_assign_id" active-text="自动分配学校ID" inactive-text="手动分发" />
+        </el-form-item>
+        <el-form-item label="负责人 / 联系方式">
+          <el-input v-model="schoolForm.contact" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="schoolForm.note" type="textarea" :rows="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="schoolDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="saveSchoolQuick">保存学校</el-button>
       </template>
     </el-dialog>
 
@@ -190,8 +240,32 @@ const user = computed(() => {
     return {}
   }
 })
-const isSuperAdmin = computed(() => (user.value?.school_id || 0) === 0 && (user.value?.is_admin || user.value?.role === 'admin'))
+const isAdmin = computed(() => Boolean(user.value?.is_admin || user.value?.role === 'admin'))
+const isSuperAdmin = computed(() => (user.value?.school_id || 0) === 0 && isAdmin.value)
+const selectedSchool = computed(() => schools.value.find((s) => s.id === form.school_id) || null)
+const canEditSelectedSchool = computed(() => {
+  if (!selectedSchool.value) return false
+  return isSuperAdmin.value || (isAdmin.value && selectedSchool.value.id === user.value?.school_id)
+})
 
+const schoolDialogVisible = ref(false)
+const schoolForm = reactive<any>({
+  id: 0,
+  name: '',
+  code: '',
+  enroll_token: '',
+  auto_assign_id: true,
+  contact: '',
+  note: ''
+})
+
+const uninstallPin = ref('')
+
+
+async function sha256Hex(text: string) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
 const form = reactive<any>({
   id: 0,
   school_id: 1,
@@ -266,6 +340,8 @@ function openDialog(row?: any) {
     form.name = row.name
     form.description = row.description || ''
     form.unattended_pass = row.unattended_pass || ''
+    uninstallPin.value = ''
+
     form.strategy = {
       'approve-mode': 'password',
       'verification-method': 'use-both-passwords',
@@ -281,6 +357,8 @@ function openDialog(row?: any) {
     form.name = ''
     form.description = ''
     form.unattended_pass = ''
+    uninstallPin.value = ''
+
     form.strategy = {
       'approve-mode': 'password',
       'verification-method': 'use-both-passwords',
@@ -294,6 +372,10 @@ function openDialog(row?: any) {
 }
 
 async function saveGroup() {
+  if (uninstallPin.value.trim()) {
+    form.strategy['uninstall-pin-hash'] = await sha256Hex(uninstallPin.value.trim())
+  }
+
   if (!form.name.trim()) {
     ElMessage.warning('请填写分组名称')
     return
@@ -331,6 +413,46 @@ async function deleteGroup(id: number) {
   await api.delete(`/groups/${id}`)
   ElMessage.success('已删除分组')
   load()
+}
+
+function openSchoolDialog(row?: any) {
+  if (row) {
+    schoolForm.id = row.id
+    schoolForm.name = row.name || ''
+    schoolForm.code = row.code || ''
+    schoolForm.enroll_token = row.enroll_token || ''
+    schoolForm.auto_assign_id = Boolean(row.auto_assign_id)
+    schoolForm.contact = row.contact || ''
+    schoolForm.note = row.note || ''
+  } else {
+    schoolForm.id = 0
+    schoolForm.name = ''
+    schoolForm.code = ''
+    schoolForm.enroll_token = ''
+    schoolForm.auto_assign_id = true
+    schoolForm.contact = ''
+    schoolForm.note = ''
+  }
+  schoolDialogVisible.value = true
+}
+
+async function saveSchoolQuick() {
+  if (!schoolForm.name.trim() || !schoolForm.code.trim()) {
+    ElMessage.warning('请填写学校名称与编码')
+    return
+  }
+  if (schoolForm.id) {
+    await api.put(`/schools/${schoolForm.id}`, schoolForm)
+    ElMessage.success('学校信息已更新')
+  } else {
+    const created: any = await api.post('/schools', schoolForm)
+    if (created?.id) {
+      form.school_id = created.id
+    }
+    ElMessage.success('已新增学校')
+  }
+  schoolDialogVisible.value = false
+  await Promise.all([loadSchools(), load()])
 }
 
 onMounted(() => {
@@ -374,6 +496,12 @@ onMounted(() => {
 .edit-hint {
   color: #94a3b8;
   font-size: 13px;
+}
+.school-select-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
 }
 .bold { font-weight: 600; }
 </style>

@@ -720,6 +720,7 @@ Future<bool?> _openLoginDialogOnce() async {
 }
 
 Future<bool?> _openLoginDialog() async {
+  final wasLoggedIn = gFFI.userModel.isLogin;
   var username =
       TextEditingController(text: UserModel.getLocalUserInfo()?['name'] ?? '');
   var password = TextEditingController();
@@ -807,11 +808,20 @@ Future<bool?> _openLoginDialog() async {
               // Workaround for web, close the dialog first, then show the verification code dialog.
               // Otherwise, the text field will keep selecting the text and we can't input the code.
               // Not sure why this happens.
+              final closedBeforeVerify = isWeb || close == null;
               if (isWeb && close != null) close(null);
               final res = await verificationCodeDialog(
                   resp.user, resp.secret, isEmailVerification);
               if (res == true) {
-                if (!isWeb && close != null) close(false);
+                if (!isWeb && close != null) {
+                  close(false);
+                } else if (closedBeforeVerify) {
+                  final updateFuture = UserModel.updateOtherModels();
+                  if (!wasLoggedIn && gFFI.userModel.isLogin) {
+                    await gFFI.peerTabModel.switchToGroupTabAfterLogin();
+                  }
+                  await updateFuture;
+                }
                 return;
               }
             }
@@ -923,7 +933,7 @@ Future<bool?> _openLoginDialog() async {
                     close(true);
 
                     if (resp != null) {
-                      handleLoginResponse(resp, false, null);
+                      await handleLoginResponse(resp, false, null);
                     }
                   },
                 ),
@@ -994,7 +1004,11 @@ Future<bool?> _openLoginDialog() async {
   }).whenComplete(oidcAuth.close);
 
   if (res != null) {
-    await UserModel.updateOtherModels();
+    final updateFuture = UserModel.updateOtherModels();
+    if (!wasLoggedIn && gFFI.userModel.isLogin) {
+      await gFFI.peerTabModel.switchToGroupTabAfterLogin();
+    }
+    await updateFuture;
   }
 
   return res;

@@ -32,6 +32,8 @@ class UserPayload {
   String? verifier;
   UserStatus status;
   bool isAdmin = false;
+  int schoolId = 0;
+  String schoolName = '';
 
   UserPayload.fromJson(Map<String, dynamic> json)
       : name = json['name'] ?? '',
@@ -45,13 +47,20 @@ class UserPayload {
             : json['status'] == -1
                 ? UserStatus.kUnverified
                 : UserStatus.kNormal,
-        isAdmin = json['is_admin'] == true;
+        isAdmin = json['is_admin'] == true,
+        schoolId = json['school_id'] is int
+            ? json['school_id']
+            : int.tryParse('${json['school_id'] ?? 0}') ?? 0,
+        schoolName = json['school_name'] ?? '';
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> map = {
       'name': name,
       'display_name': displayName,
       'avatar': avatar,
+      'is_admin': isAdmin,
+      'school_id': schoolId,
+      'school_name': schoolName,
       'status': status == UserStatus.kDisabled
           ? 0
           : status == UserStatus.kUnverified

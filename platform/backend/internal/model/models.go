@@ -217,43 +217,43 @@ func seedDefaults(db *gorm.DB, adminUser, adminPass string) error {
 		if err := db.FirstOrCreate(&school, School{ID: 1}).Error; err != nil {
 			return err
 		}
+
+		var groupCount int64
+		db.Model(&DeviceGroup{}).Count(&groupCount)
+		if groupCount == 0 {
+			defaultStrategy, _ := json.Marshal(map[string]string{
+				"approve-mode":        "password",
+				"verification-method": "use-both-passwords",
+			})
+			groups := []DeviceGroup{
+				{
+					ID:                1,
+					SchoolID:          1,
+					Name:              "默认机房",
+					Description:       "新接入的学校终端默认归属分组",
+					StrategyJSON:      string(defaultStrategy),
+					StrategyUpdatedAt: time.Now().Unix(),
+				},
+				{
+					ID:                2,
+					SchoolID:          1,
+					Name:              "教师控制台",
+					Description:       "教师与运维人员使用的主控终端分组",
+					StrategyJSON:      "{}",
+					StrategyUpdatedAt: time.Now().Unix(),
+				},
+			}
+			for _, g := range groups {
+				if err := db.FirstOrCreate(&g, DeviceGroup{ID: g.ID}).Error; err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	// Backfill legacy rows with school_id = 0
 	db.Model(&DeviceGroup{}).Where("school_id = 0 OR school_id IS NULL").Update("school_id", 1)
 	db.Model(&Device{}).Where("school_id = 0 OR school_id IS NULL").Update("school_id", 1)
-
-	var groupCount int64
-	db.Model(&DeviceGroup{}).Count(&groupCount)
-	if groupCount == 0 {
-		defaultStrategy, _ := json.Marshal(map[string]string{
-			"approve-mode":        "password",
-			"verification-method": "use-both-passwords",
-		})
-		groups := []DeviceGroup{
-			{
-				ID:                1,
-				SchoolID:          1,
-				Name:              "默认机房",
-				Description:       "新接入的学校终端默认归属分组",
-				StrategyJSON:      string(defaultStrategy),
-				StrategyUpdatedAt: time.Now().Unix(),
-			},
-			{
-				ID:                2,
-				SchoolID:          1,
-				Name:              "教师控制台",
-				Description:       "教师与运维人员使用的主控终端分组",
-				StrategyJSON:      "{}",
-				StrategyUpdatedAt: time.Now().Unix(),
-			},
-		}
-		for _, g := range groups {
-			if err := db.FirstOrCreate(&g, DeviceGroup{ID: g.ID}).Error; err != nil {
-				return err
-			}
-		}
-	}
 
 	var userCount int64
 	db.Model(&User{}).Count(&userCount)

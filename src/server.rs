@@ -657,6 +657,8 @@ pub async fn start_server(_is_server: bool) {
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 #[tokio::main]
 pub async fn start_server(is_server: bool, no_server: bool) {
+    #[cfg(windows)]
+    crate::platform::windows::start_uninstall_gate();
     use std::sync::Once;
     static ONCE: Once = Once::new();
     ONCE.call_once(|| {

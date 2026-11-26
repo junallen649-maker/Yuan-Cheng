@@ -106,7 +106,7 @@
       <el-table-column label="所属学校 / 分组" min-width="155">
         <template #default="{ row }">
           <div class="bold">{{ row.school_name || '默认学校' }}</div>
-          <div class="sub-text">{{ row.group_name || '默认机房' }}</div>
+          <div class="sub-text">{{ row.group_name || '未分组' }}</div>
         </template>
       </el-table-column>
       <el-table-column label="名称 / 主机名" min-width="150">
@@ -192,6 +192,7 @@
         </el-form-item>
         <el-form-item label="所属机房分组">
           <el-select v-model="editForm.group_id" style="width: 100%">
+            <el-option label="未分组" :value="0" />
             <el-option v-for="g in editSchoolGroups" :key="g.id" :label="g.name" :value="g.id" />
           </el-select>
         </el-form-item>
@@ -427,7 +428,7 @@ function onSchoolFilterChange() {
 
 function onEditSchoolChange() {
   const first = editSchoolGroups.value[0]
-  if (first) editForm.group_id = first.id
+  editForm.group_id = first ? first.id : 0
 }
 
 async function loadMeta() {
@@ -455,7 +456,7 @@ function openEdit(row: any) {
   editForm.alias = row.alias || ''
   editForm.school_id = row.school_id || 1
   editForm.client_role = row.client_role || 'agent'
-  editForm.group_id = row.group_id || 1
+  editForm.group_id = row.group_id || 0
   editForm.note = row.note || ''
   editVisible.value = true
 }

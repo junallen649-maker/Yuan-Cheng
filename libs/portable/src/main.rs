@@ -158,6 +158,7 @@ fn setup(
     clear: bool,
     _args: &Vec<String>,
     _ui: &mut bool,
+    is_agent: bool,
 ) -> Option<PathBuf> {
     let dir = if let Some(dir) = dir {
         dir
@@ -174,7 +175,7 @@ fn setup(
     let mut ts = 0;
     if clear || !is_timestamp_matches(&dir, &mut ts) {
         #[cfg(windows)]
-        if _args.is_empty() {
+        if _args.is_empty() && !is_agent {
             *_ui = true;
             ui::setup();
         }
@@ -285,14 +286,13 @@ fn main() -> Result<(), String> {
     }
     let lower_arg_exe = arg_exe.to_lowercase();
     let is_agent_setup = args.is_empty() && (lower_arg_exe.contains("agent-setup") || lower_arg_exe.contains("setup-agent"));
+    let is_agent_launch = is_agent_setup
+        || lower_arg_exe.contains("agent")
+        || lower_arg_exe.contains("受控")
+        || lower_arg_exe.contains("被控")
+        || args.iter().any(|a| a == "--agent" || a == "--incoming");
     let click_setup = (args.is_empty() && lower_arg_exe.ends_with("install.exe")) || is_agent_setup;
-    #[cfg(windows)]
-    if is_agent_setup && !win::is_elevated() {
-        let launch_args = vec!["--silent-install".to_owned(), "--agent".to_owned()];
-        if win::elevate_self(&arg_exe, &launch_args) {
-            return Ok(());
-        }
-    }
+
 
     #[cfg(windows)]
     let quick_support = args.is_empty() && win::is_quick_support_exe(&arg_exe);
@@ -307,17 +307,17 @@ fn main() -> Result<(), String> {
         click_setup || args.contains(&"--silent-install".to_owned()),
         &args,
         &mut ui,
+        is_agent_launch,
     ) {
-        if is_agent_setup {
-            args = vec!["--silent-install".to_owned(), "--agent".to_owned()];
+        if is_agent_launch {
+            // A double-click never raises UAC. The binary starts headless and decides on
+            // its own whether it can register a service; service installs are triggered
+            // explicitly by an administrator or by GPO.
+            args = vec!["--agent".to_owned(), "--hidden".to_owned()];
         } else if click_setup {
             args = vec!["--install".to_owned()];
         } else if quick_support {
             args = vec!["--quick_support".to_owned()];
-        } else if lower_arg_exe.contains("agent") || lower_arg_exe.contains("受控") || lower_arg_exe.contains("被控") {
-            if !args.iter().any(|a| a == "--agent" || a == "--incoming") {
-                args.push("--agent".to_owned());
-            }
         } else if lower_arg_exe.contains("console") || lower_arg_exe.contains("控制") {
             if !args.iter().any(|a| a == "--console" || a == "--outgoing") {
                 args.push("--console".to_owned());
@@ -369,6 +369,7 @@ mod win {
         }
     }
 
+    #[allow(dead_code)]
     pub(super) fn elevate_self(exe: &str, args: &[String]) -> bool {
         use std::os::windows::ffi::OsStrExt;
         let to_wide = |s: &str| -> Vec<u16> {
