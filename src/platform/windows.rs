@@ -1813,6 +1813,9 @@ copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\
         String::new()
     } else {
         let display_icon = shortcut_icon_location.as_deref().unwrap_or(exe.as_str());
+        let nested_exe = escape_nested_cmd_ampersands(&exe);
+        let version = crate::VERSION.replace("-", ".");
+        let build_date = crate::BUILD_DATE;
         format!(
             "reg add {subkey} /f\n\
              reg add {subkey} /f /v DisplayIcon /t REG_SZ /d \"{display_icon}\"\n\
@@ -1861,9 +1864,6 @@ md \"{path}\"
 {install_remote_printer}
 {sleep}
     ",
-        nested_exe = escape_nested_cmd_ampersands(&exe),
-        version = crate::VERSION.replace("-", "."),
-        build_date = crate::BUILD_DATE,
         role_reg = if stealth_install || !config::is_incoming_only() {
             "".to_owned()
         } else {
