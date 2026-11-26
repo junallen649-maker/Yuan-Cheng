@@ -4493,7 +4493,7 @@ pub fn install_user_autostart() {
     ) else {
         return;
     };
-    if run.get_value::<String, _>(&name).as_deref() == Ok(value.as_str()) {
+    if run.get_value::<String, _>(&name).ok().as_deref() == Some(value.as_str()) {
         return;
     }
     if let Err(err) = run.set_value(&name, &value) {
