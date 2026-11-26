@@ -349,7 +349,7 @@ jobs:
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
           sed -i '/dpiAware/d' res/manifest.xml
-          cp ./polaris/polaris.exe ./polaris/Polaris.exe
+          mv ./polaris/polaris.exe ./polaris/Polaris.exe.tmp && mv ./polaris/Polaris.exe.tmp ./polaris/Polaris.exe
           pushd ./libs/portable
           pip3 install -r requirements.txt
           python3 ./generate.py -f ../../polaris/ -o . -e ../../polaris/Polaris.exe
@@ -1439,14 +1439,10 @@ jobs:
           sed -i "s/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g" ./flutter/android/gradle.properties
           # temporary use debug sign config
           sed -i "s/signingConfigs.release/signingConfigs.debug/g" ./flutter/android/app/build.gradle
-          mv ./flutter/android/app/src/main/jniLibs/arm64-v8a/libpolaris.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/libpolaris.so
           cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/arm64-v8a/
-          mv ./flutter/android/app/src/main/jniLibs/armeabi-v7a/libpolaris.so ./flutter/android/app/src/main/jniLibs/armeabi-v7a/libpolaris.so
           cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so ./flutter/android/app/src/main/jniLibs/armeabi-v7a/
-          mv ./flutter/android/app/src/main/jniLibs/x86_64/libpolaris.so ./flutter/android/app/src/main/jniLibs/x86_64/libpolaris.so
           cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/x86_64/
           if [ "${{ env.reltype }}" = "debug" ]; then
-            mv ./flutter/android/app/src/main/jniLibs/x86/libpolaris.so ./flutter/android/app/src/main/jniLibs/x86/libpolaris.so
             cp ${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/i686-linux-android/libc++_shared.so ./flutter/android/app/src/main/jniLibs/x86/
           fi
           # build flutter
