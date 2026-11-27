@@ -319,7 +319,14 @@ pub fn core_main() -> Option<Vec<String>> {
         crate::platform::elevate_or_run_as_system(click_setup, _is_elevate, _is_run_as_system);
         return None;
     }
-    if args.is_empty() || crate::common::is_empty_uni_link(&args[0]) {
+    #[cfg(all(windows, feature = "flutter"))]
+    let is_headless_agent = is_agent
+        && !has_show_ui_flag
+        && !args.iter().any(|a| a == "--server" || a == "--service");
+    #[cfg(not(all(windows, feature = "flutter")))]
+    let is_headless_agent = false;
+
+    if !is_headless_agent && (args.is_empty() || crate::common::is_empty_uni_link(&args[0])) {
         #[cfg(target_os = "macos")]
         {
             crate::platform::macos::try_remove_temp_update_dir(None);
@@ -872,17 +879,15 @@ pub fn core_main() -> Option<Vec<String>> {
         }
     }
     //_async_logger_holder.map(|x| x.flush());
-    // A headless agent must not create a Flutter window at all. When the server was
-    // not already spawned above (because `--agent --hidden` makes `args` non-empty),
-    // start it here and drop the launcher instead of opening a hidden window.
+    // A headless agent must not create a Flutter window at all. Because `--agent` and
+    // `--hidden` are consumed into flags above, `args` is empty here; skip the in-process
+    // thread above and spawn a detached `--server` process before returning `None`.
     #[cfg(all(windows, feature = "flutter"))]
-    if is_agent
-        && !has_show_ui_flag
-        && !args.iter().any(|a| a == "--server" || a == "--service")
-    {
-        if !(args.is_empty() || crate::common::is_empty_uni_link(&args[0])) {
-            // Spawn a detached `--server` process: a thread would die with this
-            // launcher, which returns `None` and lets the runner exit immediately.
+    if is_headless_agent {
+        if (args.is_empty() || crate::common::is_empty_uni_link(&args[0]))
+            && !crate::platform::is_self_service_running()
+            && !crate::check_process("--server", true)
+        {
             if let Err(err) = crate::run_me(vec!["--server".to_owned()]) {
                 log::warn!("failed to spawn server process: {err}");
             }
