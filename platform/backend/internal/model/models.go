@@ -61,6 +61,8 @@ type Device struct {
 
 	// Computed fields for JSON response
 	Online         bool   `gorm:"-" json:"online"`
+	HbbsOnline     *bool  `gorm:"-" json:"hbbs_online,omitempty"`
+	LastSeenSec    int64  `gorm:"-" json:"last_seen_sec"`
 	SchoolName     string `gorm:"-" json:"school_name"`
 	GroupName      string `gorm:"-" json:"group_name"`
 	UnattendedPass string `gorm:"-" json:"unattended_pass"`

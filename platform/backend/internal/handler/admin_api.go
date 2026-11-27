@@ -99,11 +99,17 @@ func (h *Handler) HandleListSchools(c *gin.Context) {
 	}
 
 	var allDevs []model.Device
-	h.DB.Select("id, school_id, last_seen_at").Find(&allDevs)
-	onlineMap := make(map[uint]int)
+	h.DB.Select("id, school_id, client_role, last_seen_at").Find(&allDevs)
+	allIDs := make([]string, 0, len(allDevs))
 	for _, d := range allDevs {
-		if h.isDeviceOnline(d.LastSeenAt) {
-			onlineMap[d.SchoolID]++
+		allIDs = append(allIDs, d.ID)
+	}
+	hbbsStates, hbbsReachable, _ := h.probeLiveStates(allIDs)
+	onlineMap := make(map[uint]int)
+	for i := range allDevs {
+		h.applyDeviceLiveStatus(&allDevs[i], hbbsStates, hbbsReachable)
+		if allDevs[i].Online {
+			onlineMap[allDevs[i].SchoolID]++
 		}
 	}
 
@@ -307,8 +313,16 @@ func (h *Handler) HandleOverview(c *gin.Context) {
 	var totalAgents, onlineAgents, totalConsoles, onlineConsoles, activeConns, assignedCount int
 	groupDist := make(map[string]map[string]int)
 
+	devIDs := make([]string, 0, len(devices))
 	for _, d := range devices {
-		online := h.isDeviceOnline(d.LastSeenAt)
+		devIDs = append(devIDs, d.ID)
+	}
+	hbbsStates, hbbsReachable, _ := h.probeLiveStates(devIDs)
+
+	for i := range devices {
+		d := &devices[i]
+		h.applyDeviceLiveStatus(d, hbbsStates, hbbsReachable)
+		online := d.Online
 		gName := groupNames[d.GroupID]
 		if gName == "" {
 			gName = "未分组"
@@ -444,6 +458,14 @@ func (h *Handler) HandleListDevices(c *gin.Context) {
 	var devices []model.Device
 	query.Find(&devices)
 
+	ids := make([]string, 0, len(devices))
+	for _, d := range devices {
+		ids = append(ids, d.ID)
+	}
+	hbbsStates, hbbsReachable, probeMs := h.probeLiveStates(ids)
+	probedAt := time.Now()
+	timeoutSec := int(h.offlineThreshold().Seconds())
+
 	// Attach latest command status per device
 	var recentCmds []model.DeviceCommand
 	h.DB.Order("id DESC").Limit(500).Find(&recentCmds)
@@ -458,8 +480,9 @@ func (h *Handler) HandleListDevices(c *gin.Context) {
 	}
 
 	filtered := make([]model.Device, 0, len(devices))
+	onlineCount := 0
 	for _, d := range devices {
-		d.Online = h.isDeviceOnline(d.LastSeenAt)
+		h.applyDeviceLiveStatus(&d, hbbsStates, hbbsReachable)
 		d.SchoolName = schoolNames[d.SchoolID]
 		d.GroupName = groupNames[d.GroupID]
 		d.UnattendedPass = groupPasses[d.GroupID]
@@ -470,13 +493,122 @@ func (h *Handler) HandleListDevices(c *gin.Context) {
 		if status == "offline" && d.Online {
 			continue
 		}
+		if d.Online {
+			onlineCount++
+		}
 		filtered = append(filtered, d)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"total": len(filtered),
-		"items": filtered,
+		"total":                 len(filtered),
+		"online_count":          onlineCount,
+		"offline_count":         len(filtered) - onlineCount,
+		"hbbs_reachable":        hbbsReachable,
+		"probe_ms":              probeMs,
+		"probed_at":             probedAt,
+		"heartbeat_timeout_sec": timeoutSec,
+		"items":                 filtered,
 	})
+}
+
+func (h *Handler) HandleProbeDevices(c *gin.Context) {
+	current := c.MustGet("user").(*model.User)
+	var req struct {
+		DeviceIDs []string `json:"device_ids"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	query := h.DB.Model(&model.Device{}).Order("last_seen_at DESC")
+	if current.SchoolID > 0 {
+		query = query.Where("school_id = ?", current.SchoolID)
+	}
+	if len(req.DeviceIDs) > 0 {
+		query = query.Where("id IN ?", req.DeviceIDs)
+	}
+
+	var devices []model.Device
+	query.Find(&devices)
+
+	ids := make([]string, 0, len(devices))
+	for _, d := range devices {
+		ids = append(ids, d.ID)
+	}
+	hbbsStates, hbbsReachable, probeMs := h.probeLiveStates(ids)
+	probedAt := time.Now()
+	timeoutSec := int(h.offlineThreshold().Seconds())
+
+	states := make(map[string]gin.H, len(devices))
+	onlineCount := 0
+	for i := range devices {
+		d := &devices[i]
+		h.applyDeviceLiveStatus(d, hbbsStates, hbbsReachable)
+		if d.Online {
+			onlineCount++
+		}
+		entry := gin.H{
+			"online":             d.Online,
+			"last_seen_at":       d.LastSeenAt,
+			"last_seen_sec":      d.LastSeenSec,
+			"active_conns_count": d.ActiveConnsCount,
+		}
+		if d.HbbsOnline != nil {
+			entry["hbbs_online"] = *d.HbbsOnline
+		}
+		states[d.ID] = entry
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"total":                 len(devices),
+		"online_count":          onlineCount,
+		"offline_count":         len(devices) - onlineCount,
+		"hbbs_reachable":        hbbsReachable,
+		"probe_ms":              probeMs,
+		"probed_at":             probedAt,
+		"heartbeat_timeout_sec": timeoutSec,
+		"states":                states,
+	})
+}
+
+func (h *Handler) HandleDeviceStream(c *gin.Context) {
+	current := c.MustGet("user").(*model.User)
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+
+	_, ch, cancel := h.subscribeDevices(current.SchoolID)
+	defer cancel()
+
+	_, _ = c.Writer.WriteString(formatSSE("ready", gin.H{
+		"ok":                    true,
+		"heartbeat_timeout_sec": int(h.offlineThreshold().Seconds()),
+	}))
+	c.Writer.Flush()
+
+	keepalive := time.NewTicker(15 * time.Second)
+	defer keepalive.Stop()
+
+	ctx := c.Request.Context()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg, ok := <-ch:
+			if !ok {
+				return
+			}
+			if _, err := c.Writer.WriteString(msg); err != nil {
+				return
+			}
+			c.Writer.Flush()
+		case <-keepalive.C:
+			if _, err := c.Writer.WriteString(": ping\n\n"); err != nil {
+				return
+			}
+			c.Writer.Flush()
+		}
+	}
 }
 
 func (h *Handler) HandleUpdateDevice(c *gin.Context) {

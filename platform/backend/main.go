@@ -80,6 +80,8 @@ func main() {
 				protected.GET("/overview", h.HandleOverview)
 				protected.GET("/schools", h.HandleListSchools)
 				protected.GET("/devices", h.HandleListDevices)
+				protected.POST("/devices/probe", h.HandleProbeDevices)
+				protected.GET("/devices/stream", h.HandleDeviceStream)
 				protected.GET("/sessions", h.HandleLiveSessions)
 				protected.GET("/groups", h.HandleListGroups)
 				protected.GET("/commands", h.HandleListCommands)

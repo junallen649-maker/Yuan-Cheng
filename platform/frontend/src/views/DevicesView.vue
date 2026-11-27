@@ -36,6 +36,24 @@
       </div>
 
       <div class="actions">
+        <div class="live-pill" :class="{ active: liveConnected, paused: !autoProbe }">
+          <span class="live-dot" />
+          <span>{{ liveConnected ? '实时探活中' : (autoProbe ? '重连中...' : '探活已暂停') }}</span>
+          <span class="live-sep">·</span>
+          <span>在线 {{ onlineCount }}/{{ devices.length }}</span>
+          <span class="live-sep">·</span>
+          <span>{{ hbbsReachable ? `信令 ${probeMs}ms` : '心跳检测' }}</span>
+          <span v-if="lastProbeLabel" class="live-sep">·</span>
+          <span v-if="lastProbeLabel">{{ lastProbeLabel }}</span>
+        </div>
+        <el-switch
+          v-model="autoProbe"
+          inline-prompt
+          active-text="实时"
+          inactive-text="暂停"
+          @change="onToggleAutoProbe"
+        />
+        <el-button type="primary" plain :loading="probing" @click="probeNow">立即探活</el-button>
         <template v-if="selectedIds.length > 0">
           <el-button type="primary" plain @click="openBatchAssignID">
             批量分发 ID ({{ selectedIds.length }})
@@ -59,11 +77,20 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="45" />
-      <el-table-column label="状态" width="75">
+      <el-table-column label="状态" width="120">
         <template #default="{ row }">
-          <el-tag :type="row.online ? 'success' : 'info'" size="small" effect="light">
-            {{ row.online ? '在线' : '离线' }}
-          </el-tag>
+          <div class="status-cell">
+            <el-tag :type="row.online ? 'success' : 'info'" size="small" effect="light">
+              {{ row.online ? '在线' : '离线' }}
+            </el-tag>
+            <div class="sub-text">{{ formatLastSeen(row) }}</div>
+            <div
+              v-if="row.hbbs_online !== undefined && row.hbbs_online !== null"
+              :class="['hbbs-text', row.hbbs_online ? 'hbbs-on' : 'hbbs-off']"
+            >
+              {{ row.hbbs_online ? '信令在线' : '信令离线' }}
+            </div>
+          </div>
         </template>
       </el-table-column>
       <el-table-column label="角色" width="100">
@@ -340,12 +367,30 @@ import { ElMessage } from 'element-plus'
 import api from '@/api/client'
 
 const loading = ref(false)
+const probing = ref(false)
+const autoProbe = ref(true)
+const liveConnected = ref(false)
+const hbbsReachable = ref(false)
+const probeMs = ref(0)
+const lastProbeAt = ref('')
+const nowMs = ref(Date.now())
 const devices = ref<any[]>([])
 const schools = ref<any[]>([])
 const groups = ref<any[]>([])
 const selectedIds = ref<string[]>([])
 const showPwdMap = reactive<Record<string, boolean>>({})
-let timer: number | undefined
+let clockTimer: number | undefined
+let fallbackTimer: number | undefined
+let reconnectTimer: number | undefined
+let refreshDebounceTimer: number | undefined
+let streamAbort: AbortController | null = null
+let disposed = false
+
+const onlineCount = computed(() => devices.value.filter((d) => d.online).length)
+const lastProbeLabel = computed(() => {
+  if (!lastProbeAt.value) return ''
+  return new Date(lastProbeAt.value).toLocaleTimeString('zh-CN', { hour12: false })
+})
 
 const user = computed(() => {
   try {
@@ -437,13 +482,67 @@ async function loadMeta() {
   groups.value = gRes.items || []
 }
 
-async function loadDevices() {
-  loading.value = true
+async function fetchDevicesData(showSpinner: boolean) {
+  if (showSpinner) loading.value = true
   try {
     const res: any = await api.get('/devices', { params: filters })
     devices.value = res.items || []
+    hbbsReachable.value = !!res.hbbs_reachable
+    probeMs.value = res.probe_ms || 0
+    if (res.probed_at) lastProbeAt.value = res.probed_at
   } finally {
-    loading.value = false
+    if (showSpinner) loading.value = false
+  }
+}
+
+async function loadDevices() {
+  await fetchDevicesData(true)
+}
+
+function scheduleSilentRefresh() {
+  if (refreshDebounceTimer) return
+  refreshDebounceTimer = window.setTimeout(() => {
+    refreshDebounceTimer = undefined
+    fetchDevicesData(false)
+  }, 300)
+}
+
+function applyProbeStates(payload: any) {
+  if (!payload) return
+  hbbsReachable.value = !!payload.hbbs_reachable
+  probeMs.value = payload.probe_ms || 0
+  if (payload.probed_at) lastProbeAt.value = payload.probed_at
+  const states = payload.states || {}
+  let statusFilterNeedsRefresh = false
+  for (const row of devices.value) {
+    const st = states[row.id]
+    if (!st) continue
+    const prevOnline = !!row.online
+    row.online = !!st.online
+    if (st.hbbs_online !== undefined) row.hbbs_online = st.hbbs_online
+    if (st.last_seen_at) row.last_seen_at = st.last_seen_at
+    if (st.last_seen_sec !== undefined) row.last_seen_sec = st.last_seen_sec
+    if (st.active_conns_count !== undefined) row.active_conns_count = st.active_conns_count
+    if (filters.status !== 'all' && prevOnline !== row.online) {
+      statusFilterNeedsRefresh = true
+    }
+  }
+  if (payload.topology_changed || statusFilterNeedsRefresh) {
+    scheduleSilentRefresh()
+  }
+}
+
+async function probeNow() {
+  probing.value = true
+  try {
+    const res: any = await api.post('/devices/probe', {})
+    applyProbeStates(res)
+    const msg = res.hbbs_reachable
+      ? `探活完成：在线 ${res.online_count} / ${res.total}（信令耗时 ${res.probe_ms}ms）`
+      : `探活完成：在线 ${res.online_count} / ${res.total}`
+    ElMessage.success(msg)
+  } finally {
+    probing.value = false
   }
 }
 
@@ -583,14 +682,167 @@ function formatTime(v: string) {
   return new Date(v).toLocaleString('zh-CN', { hour12: false })
 }
 
+function formatLastSeen(row: any) {
+  if (!row.last_seen_at) return '从未上报'
+  const ts = new Date(row.last_seen_at).getTime()
+  if (!Number.isFinite(ts) || ts <= 0) return '从未上报'
+  const diffSec = Math.max(0, Math.floor((nowMs.value - ts) / 1000))
+  if (diffSec < 3) return '刚刚上报'
+  if (diffSec < 60) return `心跳 ${diffSec}秒前`
+  const min = Math.floor(diffSec / 60)
+  if (min < 60) return `心跳 ${min}分前`
+  const hr = Math.floor(min / 60)
+  return `心跳 ${hr}小时前`
+}
+
+function handleSseEvent(event: string, rawData: string) {
+  let payload: any
+  try {
+    payload = JSON.parse(rawData)
+  } catch {
+    return
+  }
+  if (event === 'probe') {
+    applyProbeStates(payload)
+  } else if (event === 'heartbeat') {
+    if (payload.last_seen_at) lastProbeAt.value = payload.last_seen_at
+    const row = devices.value.find((d) => d.id === payload.id)
+    if (!row || payload.is_new) {
+      scheduleSilentRefresh()
+      return
+    }
+    row.online = true
+    row.last_seen_at = payload.last_seen_at
+    row.last_seen_sec = 0
+    if (payload.active_conns_count !== undefined) row.active_conns_count = payload.active_conns_count
+    if (payload.temp_password !== undefined) row.temp_password = payload.temp_password
+    if (payload.has_permanent_password !== undefined) {
+      row.has_permanent_password = payload.has_permanent_password
+    }
+    if (payload.local_ips) row.local_ips = payload.local_ips
+    if (payload.remote_ip) row.remote_ip = payload.remote_ip
+    if (filters.status === 'offline') {
+      scheduleSilentRefresh()
+    }
+  }
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer || disposed || !autoProbe.value) return
+  reconnectTimer = window.setTimeout(() => {
+    reconnectTimer = undefined
+    connectStream()
+  }, 3000)
+}
+
+async function connectStream() {
+  if (streamAbort) {
+    streamAbort.abort()
+    streamAbort = null
+  }
+  if (!autoProbe.value || disposed) {
+    liveConnected.value = false
+    return
+  }
+  const token = localStorage.getItem('polaris_admin_token') || ''
+  if (!token) return
+  const controller = new AbortController()
+  streamAbort = controller
+  try {
+    const resp = await fetch('./api/admin/devices/stream', {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal
+    })
+    if (resp.status === 401) {
+      liveConnected.value = false
+      return
+    }
+    if (!resp.ok || !resp.body) {
+      throw new Error(`SSE status ${resp.status}`)
+    }
+    liveConnected.value = true
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    let curEvent = 'message'
+    let curDataLines: string[] = []
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split(/\r?\n/)
+      buf = lines.pop() ?? ''
+      for (const line of lines) {
+        if (line === '') {
+          if (curDataLines.length > 0) {
+            handleSseEvent(curEvent, curDataLines.join('\n'))
+          }
+          curEvent = 'message'
+          curDataLines = []
+        } else if (line.startsWith(':')) {
+          // keepalive ping
+        } else if (line.startsWith('event:')) {
+          curEvent = line.slice(6).trim()
+        } else if (line.startsWith('data:')) {
+          curDataLines.push(line.slice(5).trimStart())
+        }
+      }
+    }
+  } catch (err: any) {
+    if (err?.name === 'AbortError') return
+  } finally {
+    liveConnected.value = false
+    if (streamAbort === controller) {
+      streamAbort = null
+    }
+  }
+  if (autoProbe.value && !disposed) {
+    scheduleReconnect()
+  }
+}
+
+function onToggleAutoProbe(enabled: string | number | boolean) {
+  if (enabled) {
+    connectStream()
+    fetchDevicesData(false)
+  } else {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = undefined
+    }
+    if (streamAbort) {
+      streamAbort.abort()
+      streamAbort = null
+    }
+    liveConnected.value = false
+  }
+}
+
 onMounted(() => {
+  disposed = false
   loadMeta()
   loadDevices()
-  timer = window.setInterval(loadDevices, 12000)
+  connectStream()
+  clockTimer = window.setInterval(() => {
+    nowMs.value = Date.now()
+  }, 1000)
+  fallbackTimer = window.setInterval(() => {
+    if (autoProbe.value && !liveConnected.value) {
+      fetchDevicesData(false)
+    }
+  }, 6000)
 })
 
 onUnmounted(() => {
-  if (timer) clearInterval(timer)
+  disposed = true
+  if (clockTimer) clearInterval(clockTimer)
+  if (fallbackTimer) clearInterval(fallbackTimer)
+  if (reconnectTimer) clearTimeout(reconnectTimer)
+  if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer)
+  if (streamAbort) {
+    streamAbort.abort()
+    streamAbort = null
+  }
 })
 </script>
 
@@ -639,5 +891,53 @@ onUnmounted(() => {
 .sub-text {
   font-size: 12px;
   color: var(--polaris-muted);
+}
+.status-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.hbbs-text {
+  font-size: 11px;
+  line-height: 1.2;
+}
+.hbbs-on {
+  color: #16a34a;
+}
+.hbbs-off {
+  color: #94a3b8;
+}
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+.live-pill.active {
+  color: #15803d;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.live-pill.paused {
+  color: #64748b;
+}
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+.live-pill.active .live-dot {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+}
+.live-sep {
+  opacity: 0.45;
 }
 </style>

@@ -138,6 +138,7 @@ func (h *Handler) HandleSysinfo(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.notifyDeviceHeartbeat(&dev, isNew)
 
 	// Auto-assign school ID if enabled on this school and device doesn't have a school custom ID yet
 	if dev.ClientRole != "console" && !dev.IDAssigned {
@@ -256,6 +257,19 @@ func (h *Handler) HandleHeartbeat(c *gin.Context) {
 		updates["pending_disconnect"] = ""
 	}
 	h.DB.Model(&model.Device{}).Where("id = ?", req.ID).Updates(updates)
+	dev.LastSeenAt = now
+	dev.RemoteIP = c.ClientIP()
+	dev.ActiveConnsCount = len(req.Conns)
+	if req.LocalIPs != "" {
+		dev.LocalIPs = req.LocalIPs
+	}
+	if req.TempPassword != "" {
+		dev.TempPassword = req.TempPassword
+	}
+	if req.HasPermanentPassword != nil {
+		dev.HasPermanentPassword = *req.HasPermanentPassword
+	}
+	h.notifyDeviceHeartbeat(&dev, err == gorm.ErrRecordNotFound)
 
 	strategyOpts, latestTS := h.resolveDeviceStrategy(&dev)
 	resp := gin.H{
@@ -964,8 +978,16 @@ func (h *Handler) HandleClientPeers(c *gin.Context) {
 	var devices []model.Device
 	query.Find(&devices)
 
-	data := make([]gin.H, 0, len(devices))
+	peerIDs := make([]string, 0, len(devices))
 	for _, d := range devices {
+		peerIDs = append(peerIDs, d.ID)
+	}
+	hbbsStates, hbbsReachable, _ := h.probeLiveStates(peerIDs)
+
+	data := make([]gin.H, 0, len(devices))
+	for i := range devices {
+		d := devices[i]
+		h.applyDeviceLiveStatus(&d, hbbsStates, hbbsReachable)
 		name := d.Alias
 		if name == "" {
 			name = d.Hostname
@@ -974,7 +996,7 @@ func (h *Handler) HandleClientPeers(c *gin.Context) {
 			name = d.ID
 		}
 		status := 0
-		if h.isDeviceOnline(d.LastSeenAt) {
+		if d.Online {
 			status = 1
 		}
 		data = append(data, gin.H{

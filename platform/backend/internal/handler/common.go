@@ -21,6 +21,7 @@ type Handler struct {
 	DB        *gorm.DB
 	Cfg       *config.Config
 	JWTSecret string
+	hub       *liveHub
 }
 
 func New(db *gorm.DB, cfg *config.Config, jwtSecret string) *Handler {
@@ -28,6 +29,7 @@ func New(db *gorm.DB, cfg *config.Config, jwtSecret string) *Handler {
 		DB:        db,
 		Cfg:       cfg,
 		JWTSecret: jwtSecret,
+		hub:       newLiveHub(),
 	}
 }
 

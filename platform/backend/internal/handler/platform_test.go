@@ -3,11 +3,13 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 
 	"polaris-platform/internal/auth"
 	"polaris-platform/internal/config"
@@ -25,6 +27,8 @@ func setupTestHandler(t *testing.T) (*Handler, *gin.Engine) {
 		t.Fatalf("InitDB failed: %v", err)
 	}
 	cfg := config.Load()
+	cfg.RendezvousPort = 0
+	cfg.ServerPublicHost = ""
 	h := New(db, cfg, secret)
 
 	r := gin.New()
@@ -47,6 +51,8 @@ func setupTestHandler(t *testing.T) (*Handler, *gin.Engine) {
 	admin := r.Group("/api/admin")
 	admin.Use(auth.RequireUser(db, secret))
 	{
+		admin.GET("/devices", h.HandleListDevices)
+		admin.POST("/devices/probe", h.HandleProbeDevices)
 		admin.POST("/users", h.HandleCreateUser)
 		admin.PUT("/devices/:id", h.HandleUpdateDevice)
 		admin.PUT("/groups/:id", h.HandleUpdateGroup)
@@ -391,6 +397,8 @@ func TestDeletedGroupsStayDeletedAcrossRestart(t *testing.T) {
 	}
 
 	cfg := config.Load()
+	cfg.RendezvousPort = 0
+	cfg.ServerPublicHost = ""
 	h := New(db, cfg, secret)
 	r := gin.New()
 	admin := r.Group("/api/admin")
@@ -436,5 +444,121 @@ func TestDeletedGroupsStayDeletedAcrossRestart(t *testing.T) {
 	db2.Model(&model.DeviceGroup{}).Count(&afterRestartCount)
 	if afterRestartCount != 0 {
 		t.Fatalf("expected deleted groups to stay deleted after restart, got %d", afterRestartCount)
+	}
+}
+
+func TestBytesCodecAndHbbsProbeOnline(t *testing.T) {
+	// Test BytesCodec framing roundtrip for short & medium payloads
+	for _, size := range []int{0, 12, 63, 64, 300, 16384} {
+		payload := bytes.Repeat([]byte{0x5a}, size)
+		frame, err := encodeBytesCodecFrame(payload)
+		if err != nil {
+			t.Fatalf("encodeBytesCodecFrame(%d) failed: %v", size, err)
+		}
+		got, err := readBytesCodecFrame(bytes.NewReader(frame))
+		if err != nil {
+			t.Fatalf("readBytesCodecFrame(%d) failed: %v", size, err)
+		}
+		if !bytes.Equal(got, payload) {
+			t.Fatalf("roundtrip mismatch for size %d", size)
+		}
+	}
+
+	// Test mock hbbs TCP port 21115 OnlineRequest / OnlineResponse
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen failed: %v", err)
+	}
+	defer ln.Close()
+
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		_, err = readBytesCodecFrame(conn)
+		if err != nil {
+			return
+		}
+		// Send an initial KeyExchange frame (field 25) followed by OnlineResponse (field 24)
+		kxFrame, _ := encodeBytesCodecFrame(appendProtoLenField(nil, 25, []byte{0x01}))
+		_, _ = conn.Write(kxFrame)
+		// 10 peers -> 2 bytes: bit 7 (peer 0)=1, bit 5 (peer 2)=1, byte1 bit 6 (peer 9)=1 => [0xa0, 0x40]
+		respBody := appendProtoLenField(nil, 1, []byte{0xa0, 0x40})
+		respMsg := appendProtoLenField(nil, 24, respBody)
+		respFrame, _ := encodeBytesCodecFrame(respMsg)
+		_, _ = conn.Write(respFrame)
+	}()
+
+	ids := []string{"d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7", "d8", "d9"}
+	states, _, err := probeHbbsAddr(ln.Addr().String(), ids, 2*time.Second)
+	if err != nil {
+		t.Fatalf("probeHbbsAddr failed: %v", err)
+	}
+	if !states["d0"] || states["d1"] || !states["d2"] || states["d8"] || !states["d9"] {
+		t.Fatalf("unexpected bitmask decode result: %+v", states)
+	}
+
+	// Verify HandleProbeDevices respects school isolation & combines live hbbs status
+	h, r := setupTestHandler(t)
+	liveLn, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen liveLn: %v", err)
+	}
+	defer liveLn.Close()
+	_, p2Str, _ := net.SplitHostPort(liveLn.Addr().String())
+	p2Num, _ := strconv.Atoi(p2Str)
+	h.Cfg.RendezvousPort = p2Num + 1
+
+	go func() {
+		for {
+			conn, err := liveLn.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				if _, err := readBytesCodecFrame(c); err != nil {
+					return
+				}
+				respBody := appendProtoLenField(nil, 1, []byte{0x80})
+				respMsg := appendProtoLenField(nil, 24, respBody)
+				frame, _ := encodeBytesCodecFrame(respMsg)
+				_, _ = c.Write(frame)
+			}(conn)
+		}
+	}()
+
+	h.DB.Create(&model.School{ID: 2, Name: "二中", Code: "ez", EnrollToken: "ez-tok", Status: 1})
+	h.DB.Create(&model.Device{ID: "agent-s1", ClientRole: "agent", SchoolID: 1, LastSeenAt: time.Now()})
+	h.DB.Create(&model.Device{ID: "agent-s2", ClientRole: "agent", SchoolID: 2, LastSeenAt: time.Now().Add(-10 * time.Minute)})
+
+	var adminUser model.User
+	h.DB.Where("username = ?", "admin").First(&adminUser)
+	adminToken, _ := auth.GenerateToken(h.JWTSecret, &adminUser, time.Hour)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/admin/devices/probe", bytes.NewReader([]byte(`{}`)))
+	req.Header.Set("Authorization", "Bearer "+adminToken)
+	req.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("HandleProbeDevices failed: %d %s", w.Code, w.Body.String())
+	}
+	var out struct {
+		Total         int `json:"total"`
+		OnlineCount   int `json:"online_count"`
+		HbbsReachable bool `json:"hbbs_reachable"`
+		States        map[string]struct {
+			Online     bool  `json:"online"`
+			HbbsOnline *bool `json:"hbbs_online"`
+		} `json:"states"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode probe resp: %v", err)
+	}
+	if !out.HbbsReachable || out.Total != 2 || out.OnlineCount != 1 || !out.States["agent-s1"].Online || out.States["agent-s2"].Online {
+		t.Fatalf("unexpected HandleProbeDevices result: %+v", out)
 	}
 }
