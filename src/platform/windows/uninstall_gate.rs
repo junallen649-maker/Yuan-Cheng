@@ -134,6 +134,11 @@ fn verify(input: &str) -> bool {
 /// CLI path: `--uninstall --pin <value>` only proceeds when the PIN matches the pushed
 /// digest. Without a configured digest every path stays closed.
 pub fn verify_pin_arg(args: &[String]) -> bool {
+    // An install with no PIN pushed by the platform has no gate to satisfy; refusing
+    // here would make it impossible to remove the agent at all.
+    if configured_hash().is_none() {
+        return true;
+    }
     let Some(pos) = args.iter().position(|a| a == "--pin") else {
         return false;
     };

@@ -1896,6 +1896,18 @@ md \"{path}\"
         Config::set_option("conn-type".into(), "incoming".into());
         LocalConfig::set_option("client-role".into(), "agent".into());
         LocalConfig::set_option("conn-type".into(), "incoming".into());
+        // An agent install is unattended: a click-to-approve prompt on the controlled
+        // side defeats the whole point, so default to password approval unless the
+        // operator deliberately chose another mode.
+        if Config::get_option("approve-mode").is_empty()
+            || Config::get_option("approve-mode") == "both"
+            || Config::get_option("approve-mode") == "click"
+        {
+            Config::set_option("approve-mode".into(), "password".into());
+        }
+        if Config::get_option("verification-method").is_empty() {
+            Config::set_option("verification-method".into(), "use-both-passwords".into());
+        }
     }
     run_cmds(cmds, debug, "install")?;
     // Optional native path: register the same service without shelling out to sc.exe, so

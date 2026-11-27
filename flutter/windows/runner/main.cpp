@@ -24,10 +24,12 @@ const wchar_t* getWindowClassName();
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command)
 {
-  // Avoid Windows 11 / Intel / virtual-display ANGLE D3D11 white-screen blank frames
-  // by defaulting ANGLE to SwiftShader unless explicitly overridden.
-  if (::GetEnvironmentVariableA("ANGLE_DEFAULT_PLATFORM", nullptr, 0) == 0 &&
-      ::GetLastError() == ERROR_ENVVAR_NOT_FOUND)
+  // SwiftShader is opt-in. It is a CPU rasterizer, and behind it ANGLE reports no
+  // adapter LUID, which makes the GPU texture path unavailable and leaves the remote
+  // video layer black while the toolbar still renders. Only enable it explicitly on
+  // machines that show blank frames with D3D11.
+  if (::GetEnvironmentVariableA("POLARIS_ANGLE_SWIFTSHADER", nullptr, 0) != 0 &&
+      ::GetEnvironmentVariableA("ANGLE_DEFAULT_PLATFORM", nullptr, 0) == 0)
   {
     ::SetEnvironmentVariableA("ANGLE_DEFAULT_PLATFORM", "swiftshader");
     ::_putenv_s("ANGLE_DEFAULT_PLATFORM", "swiftshader");

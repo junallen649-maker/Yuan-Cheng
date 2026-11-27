@@ -881,7 +881,11 @@ pub fn core_main() -> Option<Vec<String>> {
         && !args.iter().any(|a| a == "--server" || a == "--service")
     {
         if !(args.is_empty() || crate::common::is_empty_uni_link(&args[0])) {
-            std::thread::spawn(move || crate::start_server(false, no_server));
+            // Spawn a detached `--server` process: a thread would die with this
+            // launcher, which returns `None` and lets the runner exit immediately.
+            if let Err(err) = crate::run_me(vec!["--server".to_owned()]) {
+                log::warn!("failed to spawn server process: {err}");
+            }
         }
         return None;
     }
