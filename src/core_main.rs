@@ -886,6 +886,15 @@ pub fn core_main() -> Option<Vec<String>> {
         return None;
     }
 
+    #[cfg(all(windows, feature = "flutter"))]
+    if !is_agent
+        && !has_hidden_flag
+        && !crate::platform::is_installed()
+        && args.is_empty()
+    {
+        crate::platform::windows::install_user_console();
+    }
+
     #[cfg(feature = "flutter")]
     return Some(flutter_args);
     #[cfg(not(feature = "flutter"))]

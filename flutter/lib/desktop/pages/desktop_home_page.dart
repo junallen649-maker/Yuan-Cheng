@@ -1017,10 +1017,12 @@ class _DesktopHomePageState extends State<DesktopHomePage>
     }
     if (isWindows && !bind.isDisableInstallation()) {
       if (!bind.mainIsInstalled()) {
-        return buildInstallCard("", "install_tip", "Install", () async {
-          await polarisWinManager.closeAllSubWindows();
-          bind.mainGotoInstall();
-        });
+        if (bind.mainGetLocalOption(key: 'client-role') != 'console') {
+          return buildInstallCard("", "install_tip", "Install", () async {
+            await polarisWinManager.closeAllSubWindows();
+            bind.mainGotoInstall();
+          });
+        }
       } else if (bind.mainIsInstalledLowerVersion()) {
         return buildInstallCard(
             "Status", "Your installation is lower version.", "Click to upgrade",

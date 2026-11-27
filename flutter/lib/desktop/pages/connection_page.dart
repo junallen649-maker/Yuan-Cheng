@@ -59,6 +59,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
   @override
   Widget build(BuildContext context) {
     final isIncomingOnly = bind.isIncomingOnly();
+    final isConsoleRole = bind.mainGetLocalOption(key: 'client-role') == 'console';
     startServiceWidget() => Offstage(
           offstage: !_svcStopped.value,
           child: InkWell(
@@ -71,7 +72,7 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
               .marginOnly(left: em),
         );
 
-    installButtonWidget() => (isWindows && !bind.isDisableInstallation() && !bind.mainIsInstalled() && !bind.isIncomingOnly())
+    installButtonWidget() => (isWindows && !bind.isDisableInstallation() && !bind.mainIsInstalled() && !isIncomingOnly && !isConsoleRole)
         ? InkWell(
             borderRadius: BorderRadius.circular(12),
             onTap: () async {

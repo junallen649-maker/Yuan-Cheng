@@ -4500,6 +4500,75 @@ pub fn install_user_autostart() {
         log::warn!("could not register user autostart: {err}");
     }
 }
+
+/// Ensure per-user Desktop and Start Menu shortcuts exist for a user-level Console
+/// launch so no manual install step or UAC prompt is required. Idempotent: writes `.lnk`
+/// files only when missing or when the target executable path changes.
+pub fn install_user_console() {
+    use windows::Win32::UI::Shell::{FOLDERID_Desktop, FOLDERID_Programs};
+
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let Some(exe_str) = exe.to_str() else {
+        return;
+    };
+    let app_name = crate::get_app_name();
+    let lnk_name = format!("{app_name}.lnk");
+
+    let desktop_lnk = installer_shell::get_known_folder(&FOLDERID_Desktop)
+        .ok()
+        .map(|p| p.join(&lnk_name));
+    let start_menu_lnk = installer_shell::get_known_folder(&FOLDERID_Programs)
+        .ok()
+        .map(|p| p.join(&app_name).join(&lnk_name));
+    if desktop_lnk.is_none() && start_menu_lnk.is_none() {
+        return;
+    }
+
+    let reg_subkey = format!("Software\\{app_name}");
+    let prev_exe: Option<String> = RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey(&reg_subkey)
+        .ok()
+        .and_then(|k| k.get_value("ConsoleInstallExe").ok());
+    let target_changed = prev_exe.as_deref() != Some(exe_str);
+
+    let targets = [desktop_lnk, start_menu_lnk];
+    let pending: Vec<&PathBuf> = targets
+        .iter()
+        .flatten()
+        .filter(|p| target_changed || !p.exists())
+        .collect();
+    if pending.is_empty() {
+        return;
+    }
+
+    let icon_location = get_custom_icon("", exe_str).or_else(|| Some(exe_str.to_owned()));
+    let Ok(bytes) = shortcut_bytes(exe_str, Some("--console"), icon_location.as_deref()) else {
+        return;
+    };
+
+    let mut wrote_ok = true;
+    for lnk in pending {
+        if let Some(parent) = lnk.parent() {
+            if let Err(err) = std::fs::create_dir_all(parent) {
+                log::warn!("could not create console shortcut dir {:?}: {err}", parent);
+                wrote_ok = false;
+                continue;
+            }
+        }
+        if let Err(err) = std::fs::write(lnk, &bytes) {
+            log::warn!("could not create console shortcut {:?}: {err}", lnk);
+            wrote_ok = false;
+        }
+    }
+    if target_changed && wrote_ok {
+        if let Ok((key, _)) = RegKey::predef(HKEY_CURRENT_USER).create_subkey(&reg_subkey) {
+            let exe_val = exe_str.to_owned();
+            let _ = key.set_value("ConsoleInstallExe", &exe_val);
+        }
+    }
+}
 /// Start the Shift+F10 uninstall gate. Only the per-user process has a desktop, so the
 /// session-0 service registers nothing.
 /// CLI gate used by `--uninstall`: refuses unless `--pin <value>` matches.
