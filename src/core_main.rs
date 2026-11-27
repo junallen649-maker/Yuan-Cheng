@@ -326,7 +326,7 @@ pub fn core_main() -> Option<Vec<String>> {
     #[cfg(not(all(windows, feature = "flutter")))]
     let is_headless_agent = false;
 
-    if !is_headless_agent && (args.is_empty() || crate::common::is_empty_uni_link(&args[0])) {
+    if args.is_empty() || crate::common::is_empty_uni_link(&args[0]) {
         #[cfg(target_os = "macos")]
         {
             crate::platform::macos::try_remove_temp_update_dir(None);
@@ -337,7 +337,9 @@ pub fn core_main() -> Option<Vec<String>> {
             crate::platform::try_remove_temp_update_files();
             hbb_common::config::PeerConfig::preload_peers();
         }
-        std::thread::spawn(move || crate::start_server(false, no_server));
+        if !is_headless_agent {
+            std::thread::spawn(move || crate::start_server(false, no_server));
+        }
     } else {
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         // Root CLI management commands must talk to the user `--server` main IPC.
